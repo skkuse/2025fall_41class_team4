@@ -1,0 +1,11 @@
+# .gitignore 파일
+
+# 1. API 키 파일 무시 (보안)
+.env
+
+# 2. Vector DB 데이터 폴더 무시 (용량)
+Data/
+
+# 3. Python 캐시 파일 무시
+__pycache__/
+*.pyc
