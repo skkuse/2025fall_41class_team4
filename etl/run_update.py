@@ -1,43 +1,56 @@
-# etl/run_update.py (라우터 방식 수정본)
+# etl/run_update.py (OpenAI API + 4-Collection Router 방식)
 
 import os
-import time
 import pandas as pd
 from tqdm import tqdm
 from dotenv import load_dotenv
 import chromadb
-from sentence_transformers import SentenceTransformer
+# [변경] OpenAI 임베딩 함수를 가져옵니다.
+import chromadb.utils.embedding_functions as embedding_functions
 
-# 우리 파일 임포트
+# 우리 파일 임포트 (이 파일들은 수정 필요 없음)
 from kobis_loader import get_popular_movie_list
 from tmdb_loader import find_tmdb_id, get_tmdb_details
 
 # --- (LOAD) ---
-def initialize_db(path="./Data/chroma.db"):
+def initialize_db(embedding_function, path="./Data/chroma.db"):
     """
-Success!
-ChromaDB 클라이언트를 초기화하고 4개의 전문 컬렉션을 생성합니다."""
+    ChromaDB 클라이언트를 초기화하고 4개의 전문 컬렉션을 생성합니다.
+    [변경] 모든 컬렉션에 동일한 OpenAI 임베딩 함수를 적용합니다.
+    """
     if not os.path.exists(path):
         os.makedirs(path)
     client = chromadb.PersistentClient(path=path)
     
-    # 4개의 전문 컬렉션 생성
     collections = {
-        "overview": client.get_or_create_collection(name="movies_overview"),
-        "title": client.get_or_create_collection(name="movies_title"),
-        "director": client.get_or_create_collection(name="movies_director"),
-        "actors": client.get_or_create_collection(name="movies_actors")
+        "overview": client.get_or_create_collection(
+            name="movies_overview", 
+            embedding_function=embedding_function
+        ),
+        "title": client.get_or_create_collection(
+            name="movies_title", 
+            embedding_function=embedding_function
+        ),
+        "director": client.get_or_create_collection(
+            name="movies_director", 
+            embedding_function=embedding_function
+        ),
+        "actors": client.get_or_create_collection(
+            name="movies_actors", 
+            embedding_function=embedding_function
+        )
     }
     print("ChromaDB: 4개의 전문 컬렉션(overview, title, director, actors) 준비 완료.")
     return collections
 
-def embed_and_store(embedding_model, collections, movie_details):
+def embed_and_store(collections, movie_details):
     """
-    하나의 영화 상세 정보를 받아 4개의 컬렉션에 각각 전문화된 데이터를 임베딩하고 저장합니다.
+    [변경]
+    하나의 영화 상세 정보를 받아 4개의 컬렉션에 '문서(Document)'만 저장합니다.
+    임베딩(벡터 변환)은 컬렉션에 할당된 OpenAI 함수가 자동으로 처리합니다.
     """
     
     # --- 1. 공통 메타데이터 준비 (모든 컬렉션에 저장될 원본 정보) ---
-    # (날짜, 평점, 성인등급 등 필터링 정보 포함)
     kobis_code = movie_details['kobis_code'] # 고유 ID
     metadata = {
         "kobis_code": kobis_code,
@@ -47,8 +60,8 @@ def embed_and_store(embedding_model, collections, movie_details):
         "director": movie_details['director'],
         "actors": ", ".join(movie_details['actors']),
         "genres": ", ".join(movie_details['genres']),
-        "certification": movie_details['certification'], # 성인 등급
-        "vote_average": movie_details['vote_average'],   # 평점
+        "certification": movie_details['certification'], 
+        "vote_average": movie_details['vote_average'],   
         "poster_path": movie_details['poster_path'],
         "overview": movie_details['overview']
     }
@@ -62,8 +75,8 @@ def embed_and_store(embedding_model, collections, movie_details):
 줄거리: {movie_details['overview']}
 키워드: {", ".join(movie_details['keywords'])}
 """
+        # [변경] .encode() 삭제, 'documents'로 텍스트 직접 전달
         collections['overview'].add(
-            embeddings=embedding_model.encode(doc_overview).tolist(),
             documents=[doc_overview],
             metadatas=[metadata],
             ids=[kobis_code]
@@ -72,7 +85,6 @@ def embed_and_store(embedding_model, collections, movie_details):
         # --- Collection 2: 영화 제목 ---
         doc_title = movie_details['title']
         collections['title'].add(
-            embeddings=embedding_model.encode(doc_title).tolist(),
             documents=[doc_title],
             metadatas=[metadata],
             ids=[kobis_code]
@@ -82,22 +94,19 @@ def embed_and_store(embedding_model, collections, movie_details):
         doc_director = movie_details['director']
         if doc_director != "정보 없음":
             collections['director'].add(
-                embeddings=embedding_model.encode(doc_director).tolist(),
                 documents=[doc_director],
                 metadatas=[metadata],
                 ids=[kobis_code]
             )
 
         # --- Collection 4: 배우 (상위 3명만 개별 저장) ---
-        # "톰 행크스, 톰 크루즈"가 아니라 "톰 행크스" / "톰 크루즈"로 검색되도록
-        for actor in movie_details['actors'][:3]: # 상위 3명
+        for actor in movie_details['actors'][:3]: 
             doc_actor = actor
-            actor_specific_id = f"{kobis_code}_{actor.replace(' ', '')}" # 예: "12345_TomHanks"
+            actor_specific_id = f"{kobis_code}_{actor.replace(' ', '')}"
             collections['actors'].add(
-                embeddings=embedding_model.encode(doc_actor).tolist(),
                 documents=[doc_actor],
-                metadatas=[metadata], # 메타데이터는 영화 정보 그대로
-                ids=[actor_specific_id] # ID는 영화ID+배우명으로 고유하게
+                metadatas=[metadata], 
+                ids=[actor_specific_id] 
             )
             
     except Exception as e:
@@ -109,23 +118,28 @@ def main():
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
     KOBIS_KEY = os.getenv("KOBIS_API_KEY")
     TMDB_KEY = os.getenv("TMDB_API_KEY")
-    if not all([KOBIS_KEY, TMDB_KEY]):
-        print("오류: .env 파일에 KOBIS_API_KEY, TMDB_API_KEY가 설정되었는지 확인하세요.")
+    # [추가] OpenAI API 키 로드
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    
+    if not all([KOBIS_KEY, TMDB_KEY, OPENAI_API_KEY]):
+        print("오류: .env 파일에 KOBIS_API_KEY, TMDB_API_KEY, OPENAI_API_KEY가 모두 설정되었는지 확인하세요.")
         return
 
-    # 2. 무료 임베딩 모델 로드
-    print("로컬 임베딩 모델 로드 중...")
-    model_name = "jhgan/ko-sbert-nli" 
+    # 2. [변경] OpenAI 임베딩 모델 준비 (로딩 시간 0초)
+    print("OpenAI 임베딩 기능 ('text-embedding-3-small') 준비 중...")
     try:
-        embedding_model = SentenceTransformer(model_name)
+        openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+                        api_key=OPENAI_API_KEY,
+                        model_name="text-embedding-3-small"
+                    )
     except Exception as e:
-        print(f"임베딩 모델 로드 실패: {e}")
+        print(f"OpenAI 임베딩 함수 생성 실패: {e}")
         return
-    print(f"'{model_name}' 모델 로드 완료.")
+    print("OpenAI 임베딩 기능 준비 완료.")
 
     # 3. DB 초기화 (4개 컬렉션 생성)
-    # [중요] 실행 전 기존 Data/chroma.db 폴더를 삭제하세요.
-    db_collections = initialize_db()
+    # [변경] 생성된 openai_ef를 DB 초기화 시 전달
+    db_collections = initialize_db(embedding_function=openai_ef)
 
     # 4. EXTRACT (KOBIS)
     kobis_movies_df = get_popular_movie_list(KOBIS_KEY, start_year=2004)
@@ -157,13 +171,10 @@ def main():
             continue
 
         # --- 5b. TRANSFORM & LOAD ---
-        # (ETL 단계에서는 TRANSFORM이 거의 없고, LOAD가 핵심)
-        
-        # 'details' 딕셔너리에 KOBIS 코드를 추가해서 넘겨줌
         details['kobis_code'] = movie_cd
         
-        # [수정] 배치 처리를 하지 않고 1개씩 바로 저장 (구조가 복잡해져서)
-        embed_and_store(embedding_model, db_collections, details)
+        # [변경] embed_and_store에 모델을 넘길 필요가 없어짐
+        embed_and_store(db_collections, details)
         processed_count += 1
 
     print("\n--- ETL 작업 완료 ---")
