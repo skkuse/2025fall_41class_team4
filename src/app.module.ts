@@ -4,7 +4,7 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { MoviesModule } from './movies/movies.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { DataSyncModule } from './data-sync/data-sync.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -12,7 +12,7 @@ import { DataSyncModule } from './data-sync/data-sync.module';
   }), 
   ScheduleModule.forRoot(),
   MoviesModule,
-  DataSyncModule],
+  ChatModule,],
   controllers: [AppController],
   providers: [AppService],
 })

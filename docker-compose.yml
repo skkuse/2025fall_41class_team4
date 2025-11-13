@@ -5,4 +5,4 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./chroma_data:/chroma/.chroma/index
+      - ./etl/Data/chroma.db:/chroma/.chroma/index
