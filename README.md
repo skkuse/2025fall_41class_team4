@@ -57,6 +57,14 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## ChromaDB Database Setting
+# ChromaDB Data를 backend 폴더 내부, 특정 폴더 내에 저장해놓습니다.
+# 저는 backend/etl 폴더 내에 Data를 저장해놓았습니다. 경로에 맞춰 ./etl/Data/chroma.db 부분을 수정해주시면 됩니다.
+
+```bash
+$ chroma run --path ./etl/Data/chroma.db
+```
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
