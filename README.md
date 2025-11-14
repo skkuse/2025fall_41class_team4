@@ -58,10 +58,11 @@ $ npm run test:cov
 ```
 
 ## ChromaDB Database Setting
-# ChromaDB Data를 backend 폴더 내부, 특정 폴더 내에 저장해놓습니다.
-# 저는 backend/etl 폴더 내에 Data를 저장해놓았습니다. 경로에 맞춰 ./etl/Data/chroma.db 부분을 수정해주시면 됩니다.
 
 ```bash
+# ChromaDB Data를 backend 폴더 내부, 특정 폴더 내에 저장해놓습니다.
+# 저는 backend/etl 폴더 내에 Data를 저장해놓았습니다.
+# 경로에 맞춰 ./etl/Data/chroma.db 부분을 수정해주시면 됩니다.
 $ chroma run --path ./etl/Data/chroma.db
 ```
 
