@@ -12,9 +12,10 @@ export class ChatController {
 
     constructor(private readonly chatService: ChatService) {}
 
-    @Post('test-query')
-    async testQuery(@Body() body: TestQueryDto) {
-        this.logger.log(`Received test query: "${body.question}"`);
+    @Post()
+    async handleChat(@Body() body: TestQueryDto) {
+        this.logger.log(`Received question: "${body.question}"`);
+        
         if (!body.question) {
             return { error: "Body에 equestion 필드가 필요합니다." };
         }
