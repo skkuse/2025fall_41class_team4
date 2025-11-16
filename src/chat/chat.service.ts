@@ -73,14 +73,29 @@ import { QueryAnalysisService, QueryComponents } from 'src/query-analysis/query-
         }
 
         const results = await targetCollection.query({
-        queryTexts: [queryComponents.query],
-        where: queryComponents.filter,
-        nResults: nResults,
-        include: ['metadatas', 'documents', 'distances'],
+            queryTexts: [queryComponents.query],
+            where: queryComponents.filter,
+            nResults: nResults,
+            include: ['metadatas', 'documents', 'distances'],
         });
 
-        const context = {};
+        console.log('\n--- 쿼리 결과 ---');
+        if (!results.ids[0] || results.ids[0].length === 0) {
+            console.log('검색된 결과가 없습니다.');
+            return null;
+        }
 
-        return context
+        const prettyResults = {
+            distances: results.distances[0],
+            metadatas: results.metadatas[0],
+            documents: results.documents[0],
+        };
+
+        console.log(JSON.stringify(prettyResults, null, 2));
+        return prettyResults;
     }
-}
+
+        // const context = {};
+
+        // return context
+    }

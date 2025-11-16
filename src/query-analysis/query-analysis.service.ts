@@ -42,7 +42,16 @@ export class QueryAnalysisService {
             8. 필터가 필요 없으면 'filters'는 빈 객체 {} 로 보내주세요.
 
             질문: "여자친구랑 볼만한 2020년 이후 최신 코미디 영화 추천해줘"
-            JSON 응답: { "collection": "movies_overview", "query": "여자친구랑 볼만한 코미디 영화", "filter": { "$and": [{ "release_year": { "$gte": 2020 } }, { "genre": { "$eq": "Comedy" } }] } }
+            JSON 응답 형식: 
+            {
+                "collection": "movies_overview",
+                "query": "여자친구랑 볼만한 코미디 영화",
+                "filter": {
+                    "$and": [
+                        { "release_year": { "$gte": 2020 } },
+                        { "genre": { "$eq": "Comedy" } }]
+                }
+            }
         `;
         
         const userPrompt = `질문: "${userQuestion}"\n\n응답 JSON:`;
