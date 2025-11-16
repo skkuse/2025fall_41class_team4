@@ -4,7 +4,6 @@ import OpenAI from 'openai';
 import { Where } from 'chromadb';
 
 export interface QueryComponents {
-    collection: 'movies_overview' | 'movies_title' | 'movies_director' | 'movies_actors';
     query: string;
     filter: Where;
 }
@@ -27,40 +26,104 @@ export class QueryAnalysisService {
    */
     async analyzeQuery(userQuestion: string): Promise<QueryComponents> {
         const systemPrompt = `
-            당신은 사용자의 영화 관련 질문을 ChromaDB 쿼리용 JSON 객체로 변환하는 API입니다.
-            
-            사용 가능한 컬렉션: 'movies_overview', movies_title, 'movies_director', 'movies_actors'.
+            당신은 사용자의 질문을 ChromaDB 쿼리용 JSON으로 변환하는 API입니다.
+            모든 쿼리는 'movies_overview' 컬렉션을 대상으로 합니다.
+
+            필수 제약: 
+            - 모든 쿼리에는 항상 '{ "vote_average": { "$gt": 8 } }' 필터가 포함되어야 합니다.
+            - 모든 쿼리에 항상 { "release_date": { "$gte": 1577836800 } } 필터가 포함하지마.
+
+            사용 가능한 필터 필드:
+            - 'release_date' (string, "YYYY-MM-DD" 형식)
+            - 'genres' (string, 예: "드라마", "코미디")
+            - 'director' (string, 예: "홍상수")
+            - 'actors' (string, 쉼표로 구분된 문자열)
+            - 'vote_average' (number, 0.0 ~ 10.0)
 
             규칙:
-            1. 질문에 "감독"이 포함되면 'director' 컬렉션을 대상으로 합니다.
-            2. 질문에 "배우", "출연"이 포함되면 'actor' 컬렉션을 대상으로 합니다.
-            3. 그 외에는 'movies_overview' 컬렉션을 대상으로 합니다.
-            4. "최신"은 2023년 이후 (release_year: { $gte: 2023 }) 입니다.
-            5. "여자친구"와 같은 키워드는 'Romance' 장르 필터 (genre: { $eq: "Romance" })로 해석합니다.
-            6. "80년대"는 { $and: [{ release_year: { $gte: 1980 } }, { release_year: { $lte: 1989 } }] } 입니다.
-            7. 의미 검색에 사용할 핵심 키워드를 'query' 필드에 담아주세요.
-            8. 필터가 필요 없으면 'filters'는 빈 객체 {} 로 보내주세요.
+            0. [가장 중요] '$and' 연산자: 'filter' 객체에 **2개 이상의 조건이 포함될 경우에만**, 모든 조건을 '$and' 배열로 묶어야 합니다. **조건이 1개일 경우, '$and'로 묶지 말고 해당 조건 객체를 'filter'의 값으로 직접 사용하세요.**
 
-            질문: "여자친구랑 볼만한 2020년 이후 최신 코미디 영화 추천해줘"
-            JSON 응답 형식: 
-            {
-                "collection": "movies_overview",
-                "query": "여자친구랑 볼만한 코미디 영화",
+            1. 'filter' 생성: "2020년 이후", "코미디", "크리스토퍼 놀란 감독" 같은 '사실(Factual)' 기반 조건은 'filter' 객체로 변환합니다.
+                - "슬프고 감동적인" 요청은 "genres": { "$eq": "드라마" } 필터를 추가하는 것을 고려하세요.
+                - "신나는" 또는 "스트레스 풀리는" 요청은 "genres": { "$eq": "액션" } 또는 "genres": { "$eq": "코미디" } 필터를 고려하세요.
+            
+            2. 'query' 생성 (가장 중요):
+                - "슬프고 감동적인", "여자친구랑 볼만한" 처럼 '추상적/감성적'인 키워드는 'filter'로 만들지 않습니다.
+                - 대신, 해당 감성을 만족시키는 '영화 줄거리(overview)'의 핵심 테마를 묘사하는 단어들로 'query'를 재구성합니다.
+                - 'query'는 사용자의 원본 질문이 아니라, 검색 엔진이 줄거리를 잘 찾을 수 있도록 돕는 키워드여야 합니다.
+                - [중요] 사용자의 질문에 '공포', '스릴러', '무서운' 등의 의도가 없다면, 'query'에 '죽음', '저주', '유령', '살인', '공포' 등 부정적이고 무서운 키워드는 절대 포함하지 마세요.
+
+            예시 1:
+            질문: "슬프고 감동적인 영화 추천해줘"
+            JSON 응답: { 
+                "query": "눈물, 감동, 숭고한 사랑, 가족애, 화해, 이별의 아픔, 삶의 의미", 
                 "filter": {
                     "$and": [
-                        { "release_year": { "$gte": 2020 } },
-                        { "genre": { "$eq": "Comedy" } }]
+                        { "genres": { "$eq": "드라마" } },
+                        { "vote_average": { "$gt": 7 } },
+                        { "release_date": { "$gte": 1577836800 } }
+                    ]
                 }
             }
+
+            예시 2:
+            질문: "여자친구랑 볼만한 로맨틱한 영화"
+            JSON 응답: { 
+                "query": "남녀 주인공의 만남, 사랑, 로맨스, 연애", 
+                "filter": {
+                    "$and": [
+                        { "genres": { "$eq": "Romance" } },
+                        { "vote_average": { "$gt": 7 } },
+                        { "release_date": { "$gte": 1577836800 } }
+                    ]
+                }
+            }
+
+            예시 3:
+            질문: "크리스토퍼 놀란 감독의 최신 영화"
+            JSON 응답: { 
+                "query": "크리스토퍼 놀란", 
+                "filter": { 
+                    "$and": [
+                        { "director": { "$eq": "크리스토퍼 놀란" } },
+                        { "release_date": { "$gte": 1579836800 } }, // 2020-01-01보다 더 강력한(최신) 조건이므로 우선 적용
+                        { "vote_average": { "$gt": 7 } }
+                    ]
+                }
+            }
+            
+            예시 4 (필터 조건이 없는 경우):
+            질문: "그냥 아무 영화나 추천해줘"
+            JSON 응답: {
+                "query": "인기 영화, 명작, 추천",
+                "filter": {
+                    "$and": [
+                        { "vote_average": { "$gt": 7 } },
+                        { "release_date": { "$gte": 1577836800 } }
+                    ]
+                }
+            }
+
+            예시 5 (단일 조건의 경우):
+            질문: "평점 8점 이상인 영화만 찾아줘"
+            JSON 응답: {
+                "query": "명작, 고평점, 인기 영화",
+                "filter": { "vote_average": { "$gt": 8 } }
+            }
+
+            이제 다음 질문을 JSON으로 변환하세요.
         `;
         
-        const userPrompt = `질문: "${userQuestion}"\n\n응답 JSON:`;
+        const userPrompt = `
+            질문: "${userQuestion}" 
+            질문에 대해서 위의 규칙을 엄격히 준수하여 JSON 형식으로 응답하세요.
+            `;
         
         try {
             const completion = await this.openai.chat.completions.create({
                 model: 'gpt-4.1-nano', // 또는 gpt-3.5-turbo
                 messages: [
-                    { role: 'user', content: systemPrompt },
+                    { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt},
                     ],
                     temperature: 0.1,
@@ -81,7 +144,6 @@ export class QueryAnalysisService {
             console.error('OpenAI 쿼리 분석 호출 실패:', error);
             // 실패 시 기본값 반환 (전체 검색)
             return {
-                collection: 'movies_overview',
                 query: userQuestion, // 실패하면 원본 질문을 그대로 쿼리로 사용
                 filter: {},
             };

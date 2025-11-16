@@ -2,7 +2,7 @@
 
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChromaClient, Collection } from 'chromadb';
+import { ChromaClient, Collection, Where } from 'chromadb';
 import { OpenAIEmbeddingFunction } from '@chroma-core/openai';
 import { QueryAnalysisService, QueryComponents } from 'src/query-analysis/query-analysis.service';
 
@@ -65,25 +65,35 @@ import { QueryAnalysisService, QueryComponents } from 'src/query-analysis/query-
         
         console.log('LLM 쿼리 분석 결과:', JSON.stringify(queryComponents, null, 2));
 
-        const targetCollection = this.collections.get(queryComponents.collection);
-        console.log('targetCollection:', targetCollection);
+        const targetCollection = this.collections.get('movies_overview');
+        // console.log('targetCollection:', targetCollection);
 
         if (!targetCollection) {
             throw new Error('적절한 컬렉션을 찾을 수 없습니다.');
         }
 
-        const results = await targetCollection.query({
+        const queryOptions: {
+            queryTexts: string[];
+            where?: Where; // 'where'는 선택적(optional)
+            nResults: number;
+            include: (("metadatas" | "documents" | "distances"))[];
+        } = {
             queryTexts: [queryComponents.query],
-            where: queryComponents.filter,
             nResults: nResults,
             include: ['metadatas', 'documents', 'distances'],
-        });
+        };
 
-        console.log('\n--- 쿼리 결과 ---');
-        if (!results.ids[0] || results.ids[0].length === 0) {
-            console.log('검색된 결과가 없습니다.');
-            return null;
+        // 2. LLM이 생성한 filter 객체가 비어있지 않은지 확인합니다.
+        //    (Object.keys(...).length > 0)
+        if (queryComponents.filter && Object.keys(queryComponents.filter).length > 0) {
+            // 3. 필터가 존재할 때만 'where' 옵션을 queryOptions에 추가합니다.
+            console.log('필터 적용:', queryComponents.filter);
+            queryOptions.where = queryComponents.filter;
+        } else {
+            console.log('적용된 메타데이터 필터 없음 (시맨틱 검색만 수행)');
         }
+
+        const results = await targetCollection.query(queryOptions);
 
         const prettyResults = {
             distances: results.distances[0],
@@ -94,8 +104,4 @@ import { QueryAnalysisService, QueryComponents } from 'src/query-analysis/query-
         console.log(JSON.stringify(prettyResults, null, 2));
         return prettyResults;
     }
-
-        // const context = {};
-
-        // return context
-    }
+}
