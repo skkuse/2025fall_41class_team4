@@ -25,20 +25,51 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## DataBase 테스트 방법
+카카오톡으로 보낸 링크를 통해 드라이브에서 Data를 받아온다
+Data를 폴더 맨위에 옮긴다.(etl 폴더 바깥임)
+test_query.py를 실행한다.
+실행한 뒤 무엇으로 질문할 것인지 번호를 입력해 결정한다.(줄거리 빼고는 꽤 정상적으로 돌아가는것 확인, 또한 나중에 무엇을 기준으로 질문할껀지는 GPT API에 쿼리 다듬으면서 물을 예정)
+질문한 쿼리를 입력한다.
+개봉날짜와 성인물 등급 등 필요한 제약조건를 입력한다.(테스트 안해봄)
+
 ## Project setup
 
+1. git clone으로 프로젝트를 받아옵니다.
+```bash
+$ git clone https://github.com/skkuse/2025fall_41class_team4.git 
+```
+2. 최상단 위치에 .env 파일을 만드셔서 해당 파일 내에 KOBIS, TMDB, OPENAI API 키를 작성해놓으시면 됩니다.
+3. 패키지 설치
 ```bash
 $ npm install
+```
+## ChromaDB Database Setting
+
+1. 주어진 Data 파일을 Database 폴더 안에 넣어둡니다. (./Database/Data/chromdb..) 
+2. 해당 Database 폴더 안에서 python 가상환경을 설치해주고, requirements도 설치해줍니다.
+```bash
+# python 가상환경 설치
+$ python -m venv myenv
+# requirements 설치
+$ pip install -r requirements.txt 
+# 가상환경 키기 - 가상환경을 킨 상태로 ChromaDB를 실행햐셔야합니다.
+$ source myenv/bin/activate 
+```
+3. 가상환경을 킨 상태로 chroma.db의 경로에 맞게 DB를 실행시켜줍니다.
+```bash
+# 경로에 맞춰 ./Database/Data/chroma.db 부분을 수정해주시면 됩니다.
+$ chroma run --path ./Database/Data/chroma.db
 ```
 
 ## Compile and run the project
 
 ```bash
+# watch mode - 해당 watch mode로 실행하시면 됩니다.
+$ npm run start:dev
+
 # development
 $ npm run start
-
-# watch mode
-$ npm run start:dev
 
 # production mode
 $ npm run start:prod
@@ -55,14 +86,6 @@ $ npm run test:e2e
 
 # test coverage
 $ npm run test:cov
-```
-
-## ChromaDB Database Setting
-
-```bash
-# ChromaDB Data를 backend 폴더 내부, 특정 폴더 내에 저장해놓습니다.
-# 경로에 맞춰 ./Database/Data/chroma.db 부분을 수정해주시면 됩니다.
-$ chroma run --path ./Database/Data/chroma.db
 ```
 
 ## Deployment
