@@ -1,11 +1,66 @@
-# .gitignore 파일
+# compiled output
+/dist
+/node_modules
+/build
 
-# 1. API 키 파일 무시 (보안)
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# dotenv environment variable files
 .env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
 
-# 2. Vector DB 데이터 폴더 무시 (용량)
+# temp directory
+.temp
+.tmp
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ChromaDB database
+etl/
+
 Data/
 Data1/
-# 3. Python 캐시 파일 무시
+
 __pycache__/
 *.pyc
+>>>>>>> source_repo/main
