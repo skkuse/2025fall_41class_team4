@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MoviesModule } from './movies/movies.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ChatModule } from './chat/chat.module';
+import { QueryAnalysisModule } from './query-analysis/query-analysis.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -12,7 +13,8 @@ import { ChatModule } from './chat/chat.module';
   }), 
   ScheduleModule.forRoot(),
   MoviesModule,
-  ChatModule,],
+  ChatModule,
+  QueryAnalysisModule,],
   controllers: [AppController],
   providers: [AppService],
 })
