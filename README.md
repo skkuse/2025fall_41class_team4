@@ -21,6 +21,14 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+## DataBase 테스트 방법
+1. 카카오톡으로 보낸 링크를 통해 드라이브에서 Data를 받아온다
+2. Data를 폴더 맨위에 옮긴다.(etl 폴더 바깥임)
+3. test_query.py를 실행한다.
+4. 실행한 뒤 무엇으로 질문할 것인지 번호를 입력해 결정한다.(줄거리 빼고는 꽤 정상적으로 돌아가는것 확인, 또한 나중에 무엇을 기준으로 질문할껀지는 GPT API에 쿼리 다듬으면서 물을 예정)
+5. 질문한 쿼리를 입력한다. 
+6. 개봉날짜와 성인물 등급 등 필요한 제약조건를 입력한다.(테스트 안해봄)
+
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
@@ -104,3 +112,4 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+>>>>>>> source_repo/main
