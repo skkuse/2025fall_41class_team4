@@ -1,16 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { Where } from 'chromadb';
 
-export interface QueryComponents {
-    query: string;
-    filter: Where;
+// [변경] 반환 타입이 ChromaDB 형식이 아니라, 우리만의 분석 규격으로 바뀝니다.
+export interface QueryAnalysisResult {
+  intent: 'exact_search' | 'recommendation_search' | 'condition_search'; // 의도파악 = 완전검색, 관련검색, 조건검색
+    keywords: {
+        title: string;      // (예: "인셉션")
+        genres: string[];   // (예: ["액션", "SF"])
+        actors: string[];   // (예: ["머동석", "톰 크루즈"]) -> 오타 그대로 추출
+        directors: string[];// (예: ["봉준호"])
+    };
 }
 
 @Injectable()
 export class QueryAnalysisService {
     private openai: OpenAI;
+    private readonly logger = new Logger(QueryAnalysisService.name);
 
     constructor(private configService: ConfigService) {
         const apiKey = this.configService.get<string>('OPENAI_API_KEY');
@@ -20,133 +26,130 @@ export class QueryAnalysisService {
         this.openai = new OpenAI({ apiKey });
     }
 
-    /**
-   * 1차 LLM 호출: 쿼리 분석 (Flow 3단계)
-   * 사용자의 자연어 질문을 ChromaDB가 이해할 수 있는 JSON 쿼리로 변환
-   */
-    async analyzeQuery(userQuestion: string): Promise<QueryComponents> {
+    async analyzeQuery(userQuestion: string): Promise<QueryAnalysisResult> {
+        // 프롬프트: DB 쿼리가 아니라, '정보 추출'에 집중합니다.
         const systemPrompt = `
-            당신은 사용자의 질문을 ChromaDB 쿼리용 JSON으로 변환하는 API입니다.
-            모든 쿼리는 'movies_overview' 컬렉션을 대상으로 합니다.
+        당신은 영화 검색 챗봇의 '쿼리 분석가'입니다.
+        사용자의 자연어 질문을 분석하여 JSON 형식으로 의도(intent)와 키워드(keywords)를 추출하세요.
 
-            필수 제약: 
-            - 모든 쿼리에는 항상 '{ "vote_average": { "$gt": 8 } }' 필터가 포함되어야 합니다.
-            - 모든 쿼리에 항상 { "release_date": { "$gte": 1577836800 } } 필터가 포함하지마.
+        [Intent(의도) 분류 규칙 - 우선순위 순]
 
-            사용 가능한 필터 필드:
-            - 'release_date' (string, "YYYY-MM-DD" 형식)
-            - 'genres' (string, 예: "드라마", "코미디")
-            - 'director' (string, 예: "홍상수")
-            - 'actors' (string, 쉼표로 구분된 문자열)
-            - 'vote_average' (number, 0.0 ~ 10.0)
+        1. recommendation_search (유사 영화 추천):
+        - **필수 조건**: 사용자가 **특정 영화 제목**을 언급하며, 그와 **비슷한(유사한)** 영화를 찾을 때만 선택합니다.
+        - **핵심 키워드**: "~같은", "~비슷한", "~류의", "~스타일의", "~느낌의"
+        - 예시:
+            - "인셉션 같은 영화 추천해줘" (O)
+            - "기생충이랑 비슷한 거 뭐 있어?" (O)
+            - "범죄도시 스타일의 영화 보여줘" (O)
+        - **주의**: 단순히 "재밌는 영화 추천해줘"나 "액션 영화 추천해줘"는 여기에 해당하지 않습니다.
 
-            규칙:
-            0. [가장 중요] '$and' 연산자: 'filter' 객체에 **2개 이상의 조건이 포함될 경우에만**, 모든 조건을 '$and' 배열로 묶어야 합니다. **조건이 1개일 경우, '$and'로 묶지 말고 해당 조건 객체를 'filter'의 값으로 직접 사용하세요.**
+        2. condition_search (조건 기반 검색):
+        - 특정 **조건(장르, 배우, 감독, 시기 등)**을 포함하여 영화를 찾거나 추천을 요청할 때 선택합니다.
+        - "추천해줘"라는 말이 있어도, '기준 영화' 없이 조건만 있다면 이것입니다.
+        - 예시:
+            - "마동석 나오는 액션 영화 추천해줘" (배우+장르 조건)
+            - "2023년에 나온 로맨스 영화" (시기+장르 조건)
+            - "봉준호 감독 영화 다 찾아줘" (감독 조건)
+            - "웃긴 영화 추천해줘" (장르: 코미디)
+            - "최신 영화 알려줘" (시기 조건)
 
-            1. 'filter' 생성: "2020년 이후", "코미디", "크리스토퍼 놀란 감독" 같은 '사실(Factual)' 기반 조건은 'filter' 객체로 변환합니다.
-                - "슬프고 감동적인" 요청은 "genres": { "$eq": "드라마" } 필터를 추가하는 것을 고려하세요.
-                - "신나는" 또는 "스트레스 풀리는" 요청은 "genres": { "$eq": "액션" } 또는 "genres": { "$eq": "코미디" } 필터를 고려하세요.
-            
-            2. 'query' 생성 (가장 중요):
-                - "슬프고 감동적인", "여자친구랑 볼만한" 처럼 '추상적/감성적'인 키워드는 'filter'로 만들지 않습니다.
-                - 대신, 해당 감성을 만족시키는 '영화 줄거리(overview)'의 핵심 테마를 묘사하는 단어들로 'query'를 재구성합니다.
-                - 'query'는 사용자의 원본 질문이 아니라, 검색 엔진이 줄거리를 잘 찾을 수 있도록 돕는 키워드여야 합니다.
-                - [중요] 사용자의 질문에 '공포', '스릴러', '무서운' 등의 의도가 없다면, 'query'에 '죽음', '저주', '유령', '살인', '공포' 등 부정적이고 무서운 키워드는 절대 포함하지 마세요.
+        3. exact_search (단일 정보 검색):
+        - 특정 영화, 특정 인물에 대한 **사실 정보**나 **줄거리** 등을 물어볼 때 선택합니다.
+        - 조건이나 추천 요청 없이, 대상을 콕 집어서 물어보는 경우입니다.
+        - 예시:
+            - "범죄도시 감독이 누구야?"
+            - "인셉션 줄거리 알려줘"
+            - "기생충 언제 개봉했어?"
+            - "아이언맨 보여줘"
 
-            예시 1:
-            질문: "슬프고 감동적인 영화 추천해줘"
-            JSON 응답: { 
-                "query": "눈물, 감동, 숭고한 사랑, 가족애, 화해, 이별의 아픔, 삶의 의미", 
-                "filter": {
-                    "$and": [
-                        { "genres": { "$eq": "드라마" } },
-                        { "vote_average": { "$gt": 7 } },
-                        { "release_date": { "$gte": 1577836800 } }
-                    ]
-                }
+        [Keywords(키워드) 추출 규칙]
+        - 사용자가 언급한 고유명사(배우, 감독, 영화제목)는 **오타가 있어도 수정하지 말고 들리는 대로** 적으세요. (예: "머동석" -> "머동석")
+        - genres: 질문에서 유추되는 장르 (예: "웃긴"->코미디, "무서운"->공포, "슬픈"->드라마)
+        - title: 영화 제목이 명시된 경우
+        - actors: 배우 이름
+        - directors: 감독 이름
+
+        [출력 형식 (JSON)]
+        {
+        "intent": "exact_search" | "recommendation_search" | "condition_search",
+        "keywords": {
+            "title": string | null,
+            "genres": string[],
+            "actors": string[],
+            "directors": string[]
+        }
+        }
+
+        [예시]
+        질문: "범죄도시 감독이 누구야?"
+        응답: {
+            "intent": "exact_search",
+            "keywords": {
+            "title": "범죄도시",
+            "genres": [],
+            "actors": [],
+            "directors": []
             }
+        }
 
-            예시 2:
-            질문: "여자친구랑 볼만한 로맨틱한 영화"
-            JSON 응답: { 
-                "query": "남녀 주인공의 만남, 사랑, 로맨스, 연애", 
-                "filter": {
-                    "$and": [
-                        { "genres": { "$eq": "Romance" } },
-                        { "vote_average": { "$gt": 7 } },
-                        { "release_date": { "$gte": 1577836800 } }
-                    ]
-                }
+        질문: "머동석 나오는 액션 영화 추천해줘"
+        응답: {
+            "intent": "condition_search",
+            "keywords": {
+            "title": "",
+            "genres": ["액션"],
+            "actors": ["머동석"],
+            "directors": []
             }
+        }
 
-            예시 3:
-            질문: "크리스토퍼 놀란 감독의 최신 영화"
-            JSON 응답: { 
-                "query": "크리스토퍼 놀란", 
-                "filter": { 
-                    "$and": [
-                        { "director": { "$eq": "크리스토퍼 놀란" } },
-                        { "release_date": { "$gte": 1579836800 } }, // 2020-01-01보다 더 강력한(최신) 조건이므로 우선 적용
-                        { "vote_average": { "$gt": 7 } }
-                    ]
-                }
+        질문: "인셉션 영화 소개해줘"
+        응답: {
+            "intent": "exact_search",
+            "keywords": {
+            "title": "인셉션",
+            "genres": [],
+            "actors": [],
+            "directors": []
             }
-            
-            예시 4 (필터 조건이 없는 경우):
-            질문: "그냥 아무 영화나 추천해줘"
-            JSON 응답: {
-                "query": "인기 영화, 명작, 추천",
-                "filter": {
-                    "$and": [
-                        { "vote_average": { "$gt": 7 } },
-                        { "release_date": { "$gte": 1577836800 } }
-                    ]
-                }
-            }
-
-            예시 5 (단일 조건의 경우):
-            질문: "평점 8점 이상인 영화만 찾아줘"
-            JSON 응답: {
-                "query": "명작, 고평점, 인기 영화",
-                "filter": { "vote_average": { "$gt": 8 } }
-            }
-
-            이제 다음 질문을 JSON으로 변환하세요.
+        }
         `;
-        
-        const userPrompt = `
-            질문: "${userQuestion}" 
-            질문에 대해서 위의 규칙을 엄격히 준수하여 JSON 형식으로 응답하세요.
-            `;
-        
+
+        const userPrompt = `질문: "${userQuestion}"`;
+
         try {
             const completion = await this.openai.chat.completions.create({
-                model: 'gpt-4.1-nano', // 또는 gpt-3.5-turbo
+                model: 'gpt-4.1-nano', // 또는 gpt-3.5-turbo, gpt-4
                 messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt},
-                    ],
-                    temperature: 0.1,
-                    
-                    // 1. JSON 모드를 활성화하여 항상 유효한 JSON을 받도록 함
-                    response_format: { type: 'json_object' },
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+                ],
+                temperature: 0.1, // 분석은 창의성이 필요 없으므로 낮게 설정
+                response_format: { type: 'json_object' },
             });
-    
-            const jsonResponse = completion.choices[0].message.content;
 
-            if(jsonResponse){
-                return JSON.parse(jsonResponse) as unknown as QueryComponents;
-            } else {
-                throw new Error('Query analysis 분석 결과가 없습니다. (Null 반환)');
+            const jsonResponse = completion.choices[0].message.content;
+            if (!jsonResponse) {
+                throw new Error('OpenAI 응답이 비어있습니다.');
             }
 
+            const parsedResult = JSON.parse(jsonResponse) as QueryAnalysisResult;
+            
+            this.logger.log(`분석 결과: ${JSON.stringify(parsedResult)}`);
+            
+            return parsedResult;
         } catch (error) {
-            console.error('OpenAI 쿼리 분석 호출 실패:', error);
-            // 실패 시 기본값 반환 (전체 검색)
-            return {
-                query: userQuestion, // 실패하면 원본 질문을 그대로 쿼리로 사용
-                filter: {},
-            };
+        this.logger.error('쿼리 분석 실패', error);
+        // 실패 시 기본값 반환
+        return {
+            intent: 'recommendation_search',
+            keywords: {
+            title: userQuestion,
+            genres: [],
+            actors: [],
+            directors: [],
+            },
+        };
         }
     }
 }
