@@ -1,107 +1,37 @@
 // src/chroma/chroma.service.ts (예시)
-
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ChromaClient, Collection, Where } from 'chromadb';
-import { OpenAIEmbeddingFunction } from '@chroma-core/openai';
-import { QueryAnalysisService, QueryComponents } from 'src/query-analysis/query-analysis.service';
+import { QueryAnalysisService } from 'src/query-analysis/query-analysis.service';
+import { QueryRefinementService } from 'src/query-refinement/query-refinement.service';
+import { TmdbClientService } from 'src/tmdb-client/tmdb-client.service';
+import { LlmResponseService } from 'src/llm-response/llm-response.service';
 
-    @Injectable()
-    export class ChatService implements OnModuleInit {
-    private client: ChromaClient;
-    private readonly openai_key: string;
-    private collections: Map<string, Collection> = new Map();
-    private embedder: OpenAIEmbeddingFunction;
+@Injectable()
+export class ChatService {
+    constructor(
+        private readonly analysisService: QueryAnalysisService,
+        private readonly refinementService: QueryRefinementService,
+        private readonly movieSearchService: TmdbClientService,
+        private readonly llmResponseService: LlmResponseService, 
+    ) {}
 
-    constructor(private configService: ConfigService, private queryAnalysisService: QueryAnalysisService) {
+    async handleChat(userQuestion: string) {
+        // 1. 분석
+        const analysis = await this.analysisService.analyzeQuery(userQuestion);
 
-        const key = this.configService.get<string>('OPENAI_API_KEY');
+        // 2. 정제 (오타 수정)
+        const refinedAnalysis = await this.refinementService.refineQuery(analysis);
 
-        if (!key) {
-            throw new Error('OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.');
-        }
+        // 3. 검색 (TMDB)
+        const movies = await this.movieSearchService.searchMovies(refinedAnalysis);
 
-        this.openai_key = key;
+        // 4. 답변 생성 (LLM)
+        const finalAnswer = await this.llmResponseService.generateAnswer(userQuestion, movies);
 
-        // 1. ChromaClient 초기화 (서버 주소로 접속)
-        this.client = new ChromaClient({
-            path: 'http://localhost:8000', // 1단계에서 실행한 서버 주소
-        });
-
-        this.embedder = new OpenAIEmbeddingFunction({
-            modelName: 'text-embedding-3-small',
-            apiKey: this.openai_key,
-        });
-    }
-    
-    async onModuleInit() {
-        try {
-        // 3. 컬렉션 가져오기
-            const collectionNames = ['movies_overview', 'movies_title', 'movies_director', 'movies_actors'];
-
-            for (const name of collectionNames) {
-                const collection = await this.client.getCollection({
-                    name: name,
-                    embeddingFunction: this.embedder,
-                });
-                this.collections.set(name, collection);
-                console.log(
-                    `'${name}' 컬렉션 연결 성공! (총 ${await collection.count()}개 데이터)`,
-                );
-            }
-
-        } catch (e) {
-        console.error(`오류: 컬렉션을 가져오는 데 실패했습니다.`, e);
-        console.log('ChromaDB 서버가 실행 중인지 확인하세요 (chroma run ...).');
-        }
-    }
-
-
-
-    async queryMovie(question: string, nResults = 3) {
-
-        console.log('--- 1차 LLM: 쿼리 분석 시작 ---');
-        const queryComponents: QueryComponents = await this.queryAnalysisService.analyzeQuery(question);
-        
-        console.log('LLM 쿼리 분석 결과:', JSON.stringify(queryComponents, null, 2));
-
-        const targetCollection = this.collections.get('movies_overview');
-        // console.log('targetCollection:', targetCollection);
-
-        if (!targetCollection) {
-            throw new Error('적절한 컬렉션을 찾을 수 없습니다.');
-        }
-
-        const queryOptions: {
-            queryTexts: string[];
-            where?: Where; // 'where'는 선택적(optional)
-            nResults: number;
-            include: (("metadatas" | "documents" | "distances"))[];
-        } = {
-            queryTexts: [queryComponents.query],
-            nResults: nResults,
-            include: ['metadatas', 'documents', 'distances'],
+        // 5. 결과 반환 (프론트엔드로)
+        return {
+            question: userQuestion,
+            answer: finalAnswer,
+            movies: movies // 원본 데이터도 같이 주면 프론트에서 포스터 띄우기 좋음
         };
-
-        // 2. LLM이 생성한 filter 객체가 비어있지 않은지 확인합니다.
-        //    (Object.keys(...).length > 0)
-        if (queryComponents.filter && Object.keys(queryComponents.filter).length > 0) {
-            // 3. 필터가 존재할 때만 'where' 옵션을 queryOptions에 추가합니다.
-            console.log('필터 적용:', queryComponents.filter);
-            queryOptions.where = queryComponents.filter;
-        } else {
-            console.log('적용된 메타데이터 필터 없음 (시맨틱 검색만 수행)');
-        }
-
-        const results = await targetCollection.query(queryOptions);
-
-        const prettyResults = {
-            distances: results.distances[0],
-            metadatas: results.metadatas[0],
-            documents: results.documents[0],
-        };
-
-        console.log(JSON.stringify(prettyResults, null, 2));
-        return prettyResults;
     }
 }
