@@ -25,6 +25,38 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## 파일 구조
+```
+src/
+├── app.module.ts                 # [메인] 모든 모듈을 하나로 묶는 루트 모듈
+├── main.ts                       # [메인] 앱 실행 엔트리 포인트
+│
+├── common/                       # [공통] 여러 모듈에서 함께 쓰는 데이터 타입 정의
+│   └── interfaces/
+│       └── chat.interface.ts     # 모듈끼리 주고받을 데이터 규격 (DTO)
+│
+├── chat/                         #  
+│   ├── chat.controller.ts        # 사용자 요청(POST /chat)을 받음
+│   ├── chat.service.ts           # 분석 -> 교정 -> 검색 -> 답변생성 순서대로 지시
+│   └── chat.module.ts            # 하위 4개 모듈을 Imports하여 Service들을 연결
+│
+├── query-analysis/               # (Step 1, 2)
+│   ├── query-analysis.service.ts # 사용자 질문을 분석해 JSON(의도, 키워드)으로 변환
+│   └── query-analysis.module.ts
+│
+├── query-refinement/             # (Step 3) - ChromaDB 담당 (RAG Part)
+│   ├── query-refinement.service.ts  # 분석된 키워드의 오타를 수정하고 정규화
+│   └── rag.module.ts
+│
+├── tmdb-client/                         # (Step 4) - 외부 API 담당
+│   ├── tmdb.service.ts           # 정규화된 키워드로 실제 영화 정보 & 포스터 검색
+│   └── tmdb.module.ts
+│
+└── llm-response/                 # (Step 5) - 최종 답변 생성
+    ├── llm-response.service.ts   # 수집된 영화 정보를 바탕으로 사용자에게 줄 답변 작성
+    └── llm-response.module.ts
+```
+
 ## DataBase 테스트 방법
 1. 카카오톡으로 보낸 링크를 통해 드라이브에서 Data를 받아온다
 2. Data를 폴더 맨위에 옮긴다.(etl 폴더 바깥임)
