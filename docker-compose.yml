@@ -1,8 +1,23 @@
-version: '3.8'
+version: '3.9'
+
 services:
-  chromadb:
+  # 1. 영화용 DB (포트 8000)
+  chroma-movie:
     image: chromadb/chroma
     ports:
       - "8000:8000"
     volumes:
-      - ./etl/Data/chroma.db:/chroma/.chroma/index
+      # 로컬의 movie-rag-db 폴더를 컨테이너 내부에 연결
+      - ./Database/Data/movie-rag-db:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+
+  # 2. 공연용 DB (포트 8001)
+  chroma-performance:
+    image: chromadb/chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./Database/Data/performance-search-db:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
