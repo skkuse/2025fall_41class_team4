@@ -2,9 +2,8 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChromaClient, Collection } from 'chromadb';
 import { OpenAIEmbeddingFunction } from '@chroma-core/openai';
-// 이전 단계에서 만든 QueryAnalysisResult 타입을 import 합니다.
-// (경로는 실제 프로젝트 구조에 맞게 조정해주세요)
-import { QueryAnalysisResult } from '../query-analysis/query-analysis.service';
+
+import { MovieQueryAnalysisResult } from '../query-analysis/movie-query-analysis.service';
 
 @Injectable()
 export class QueryRefinementService implements OnModuleInit {
@@ -16,7 +15,7 @@ export class QueryRefinementService implements OnModuleInit {
 
     constructor(private configService: ConfigService) {
         const openaiKey = this.configService.get<string>('OPENAI_API_KEY');
-        const chromaUrl = this.configService.get<string>('CHROMA_DB_URL') || 'http://localhost:8000';
+        const chromaUrl = this.configService.get<string>('MOVIE_DB_URL');
 
         if (!openaiKey) {
         throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
@@ -28,15 +27,14 @@ export class QueryRefinementService implements OnModuleInit {
         this.client = new ChromaClient({ path: chromaUrl });
         this.embedder = new OpenAIEmbeddingFunction({
         apiKey: this.openai_key,
-        modelName: 'text-embedding-3-small', // 데이터를 넣을 때 쓴 모델과 동일해야 함
+        modelName: 'text-embedding-3-small',
         });
     }
 
-    // 앱이 시작될 때 컬렉션들을 미리 연결해둡니다.
     async onModuleInit() {
         const collectionNames = ['movies_actors', 'movies_director', 'movies_genres', 'movies_title'];
 
-        this.logger.log('ChromaDB 컬렉션 연결 시도 중...');
+        this.logger.log('MovieDB 컬렉션 연결 시도 중...');
 
         for (const name of collectionNames) {
         try {
@@ -56,10 +54,10 @@ export class QueryRefinementService implements OnModuleInit {
      * [Step 3] 오타 수정 및 엔티티 정규화
      * 분석된 쿼리 객체를 받아, 벡터 유사도 검색을 통해 정확한 명칭으로 교정합니다.
      */
-    async refineQuery(analysis: QueryAnalysisResult): Promise<QueryAnalysisResult> {
+    async refineQuery(analysis: MovieQueryAnalysisResult): Promise<MovieQueryAnalysisResult> {
         
         // 원본 객체 복사 (불변성 유지)
-        const refined = JSON.parse(JSON.stringify(analysis)) as QueryAnalysisResult;
+        const refined = JSON.parse(JSON.stringify(analysis)) as MovieQueryAnalysisResult;
         const { keywords } = refined;
 
         // 1. 배우 이름 교정 (병렬 처리)
