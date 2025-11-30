@@ -1,37 +1,81 @@
-// src/chroma/chroma.service.ts (예시)
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { QueryAnalysisService } from 'src/query-analysis/query-analysis.service';
-import { QueryRefinementService } from 'src/query-refinement/query-refinement.service';
-import { TmdbClientService } from 'src/tmdb-client/tmdb-client.service';
-import { LlmResponseService } from 'src/llm-response/llm-response.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { ChatRequestDto, ChatCategory } from './dto/chat-request.dto';
+
+import { MovieQueryAnalysisService } from '../query-analysis/movie-query-analysis.service';
+import { PerformanceQueryAnalysisService } from '../query-analysis/performance-query-analysis.service';
+
+import { QueryRefinementService } from '../query-refinement/query-refinement.service';
+
+import { MovieSearchService } from '../search/movie-search.service';
+import { PerformanceSearchService } from '../search/performance-search.service';
+
+import { MovieLlmResponseService } from '../llm-response/movie-llm-response.service';
+import { PerformanceLlmResponseService } from '../llm-response/performance-llm-response.service';
 
 @Injectable()
 export class ChatService {
+    private readonly logger = new Logger(ChatService.name);
+
     constructor(
-        private readonly analysisService: QueryAnalysisService,
+        private readonly movieAnalysisService: MovieQueryAnalysisService,
+        private readonly performanceAnalysisService: PerformanceQueryAnalysisService,
         private readonly refinementService: QueryRefinementService,
-        private readonly movieSearchService: TmdbClientService,
-        private readonly llmResponseService: LlmResponseService, 
+        private readonly movieSearchService: MovieSearchService,
+        private readonly performanceSearchService: PerformanceSearchService,
+        private readonly movieLlmResponseService: MovieLlmResponseService,
+        private readonly performanceLlmResponseService: PerformanceLlmResponseService,
     ) {}
 
-    async handleChat(userQuestion: string) {
-        // 1. 분석
-        const analysis = await this.analysisService.analyzeQuery(userQuestion);
+    async handleChat(dto: ChatRequestDto) {
+        const { category, question } = dto;
+        
+        try {
+        if (category === ChatCategory.MOVIE) {
+            this.logger.log('🎬 영화 파이프라인 시작');
 
-        // 2. 정제 (오타 수정)
-        const refinedAnalysis = await this.refinementService.refineQuery(analysis);
+            // 1. 분석
+            const analysis = await this.movieAnalysisService.analyzeQuery(question);
 
-        // 3. 검색 (TMDB)
-        const movies = await this.movieSearchService.searchMovies(refinedAnalysis);
+            // 2. 정제
+            const refinedAnalysis = await this.refinementService.refineQuery(analysis);
 
-        // 4. 답변 생성 (LLM)
-        const finalAnswer = await this.llmResponseService.generateAnswer(userQuestion, movies);
+            // 3. 검색 (TMDB)
+            const movies = await this.movieSearchService.search(refinedAnalysis);
 
-        // 5. 결과 반환 (프론트엔드로)
-        return {
-            question: userQuestion,
-            answer: finalAnswer,
-            movies: movies // 원본 데이터도 같이 주면 프론트에서 포스터 띄우기 좋음
-        };
+            // 4. 답변 생성
+            const response = await this.movieLlmResponseService.generateAnswer(question, movies);
+
+            return {
+            category,
+            question,
+            answer: response.answer,
+            items: response.items, // 영화 카드 리스트
+            };
+        } 
+        
+        else {
+            this.logger.log('🎭 공연 파이프라인 시작');
+
+            // 1. 분석
+            const analysis = await this.performanceAnalysisService.analyzeQuery(question);
+
+            // 2. RAG 검색
+            const performances = await this.performanceSearchService.search(analysis);
+
+            // 3. 답변 생성
+            const response = await this.performanceLlmResponseService.generateAnswer(question, performances);
+
+            return {
+                category,
+                question,
+                answer: response.answer,
+                items: response.items,
+            };
+        }
+
+        } catch (error) {
+        this.logger.error(`Chat Processing Error [${category}]`, error);
+        throw error;
+        }
     }
 }
