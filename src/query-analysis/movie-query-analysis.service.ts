@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
 // [변경] 반환 타입이 ChromaDB 형식이 아니라, 우리만의 분석 규격으로 바뀝니다.
-export interface QueryAnalysisResult {
+export interface MovieQueryAnalysisResult {
   intent: 'exact_search' | 'recommendation_search' | 'condition_search'; // 의도파악 = 완전검색, 관련검색, 조건검색
     keywords: {
         title: string;      // (예: "인셉션")
@@ -14,9 +14,9 @@ export interface QueryAnalysisResult {
 }
 
 @Injectable()
-export class QueryAnalysisService {
+export class MovieQueryAnalysisService {
     private openai: OpenAI;
-    private readonly logger = new Logger(QueryAnalysisService.name);
+    private readonly logger = new Logger(MovieQueryAnalysisService.name);
 
     constructor(private configService: ConfigService) {
         const apiKey = this.configService.get<string>('OPENAI_API_KEY');
@@ -26,7 +26,7 @@ export class QueryAnalysisService {
         this.openai = new OpenAI({ apiKey });
     }
 
-    async analyzeQuery(userQuestion: string): Promise<QueryAnalysisResult> {
+    async analyzeQuery(userQuestion: string): Promise<MovieQueryAnalysisResult> {
         // 프롬프트: DB 쿼리가 아니라, '정보 추출'에 집중합니다.
         const systemPrompt = `
         당신은 영화 검색 챗봇의 '쿼리 분석가'입니다.
@@ -85,10 +85,10 @@ export class QueryAnalysisService {
         응답: {
             "intent": "exact_search",
             "keywords": {
-            "title": "범죄도시",
-            "genres": [],
-            "actors": [],
-            "directors": []
+                "title": "범죄도시",
+                "genres": [],
+                "actors": [],
+                "directors": []
             }
         }
 
@@ -96,10 +96,10 @@ export class QueryAnalysisService {
         응답: {
             "intent": "condition_search",
             "keywords": {
-            "title": "",
-            "genres": ["액션"],
-            "actors": ["머동석"],
-            "directors": []
+                "title": "",
+                "genres": ["액션"],
+                "actors": ["머동석"],
+                "directors": []
             }
         }
 
@@ -107,10 +107,10 @@ export class QueryAnalysisService {
         응답: {
             "intent": "exact_search",
             "keywords": {
-            "title": "인셉션",
-            "genres": [],
-            "actors": [],
-            "directors": []
+                "title": "인셉션",
+                "genres": [],
+                "actors": [],
+                "directors": []
             }
         }
         `;
@@ -133,7 +133,7 @@ export class QueryAnalysisService {
                 throw new Error('OpenAI 응답이 비어있습니다.');
             }
 
-            const parsedResult = JSON.parse(jsonResponse) as QueryAnalysisResult;
+            const parsedResult = JSON.parse(jsonResponse) as MovieQueryAnalysisResult;
             
             this.logger.log(`분석 결과: ${JSON.stringify(parsedResult)}`);
             
@@ -144,10 +144,10 @@ export class QueryAnalysisService {
         return {
             intent: 'recommendation_search',
             keywords: {
-            title: userQuestion,
-            genres: [],
-            actors: [],
-            directors: [],
+                title: userQuestion,
+                genres: [],
+                actors: [],
+                directors: [],
             },
         };
         }
