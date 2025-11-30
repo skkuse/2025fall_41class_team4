@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { LlmResponseService } from './llm-response.service';
+import { MovieLlmResponseService } from './movie-llm-response.service';
+import { PerformanceLlmResponseService } from './performance-llm-response.service';
 
 @Module({
     imports: [ConfigModule],
-    providers: [LlmResponseService],
-    exports: [LlmResponseService],
+    providers: [MovieLlmResponseService, PerformanceLlmResponseService],
+    exports: [MovieLlmResponseService, PerformanceLlmResponseService],
 })
 export class LlmResponseModule {}

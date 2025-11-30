@@ -1,9 +1,6 @@
-import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Logger, BadRequestException } from '@nestjs/common';
 import { ChatService } from './chat.service';
-
-class TestQueryDto {
-    question: string;
-}
+import { ChatRequestDto } from './dto/chat-request.dto';
 
 @Controller('chat')
 export class ChatController {
@@ -12,15 +9,14 @@ export class ChatController {
     constructor(private readonly chatService: ChatService) {}
 
     @Post()
-    async handleChat(@Body() body: TestQueryDto) {
-        this.logger.log(`Received question: "${body.question}"`);
-        
-        // 오타 수정: equestion -> question
-        if (!body.question) {
-            return { error: "Body에 question 필드가 필요합니다." };
+    async handleChat(@Body() dto: ChatRequestDto) {
+        this.logger.log(`📩 요청 수신: [${dto.category}] "${dto.question}"`);
+
+        if (!dto.question || !dto.category) {
+        throw new BadRequestException('question과 category는 필수입니다.');
         }
 
-        const results = await this.chatService.handleChat(body.question);
-        return results; 
+        const result = await this.chatService.handleChat(dto);
+        return result;
     }
 }

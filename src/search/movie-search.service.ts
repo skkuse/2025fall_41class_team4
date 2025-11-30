@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
-import { QueryAnalysisResult } from '../query-analysis/query-analysis.service';
+import { MovieQueryAnalysisResult } from '../query-analysis/movie-query-analysis.service';
 
 export interface MovieData {
     id: number;
@@ -14,10 +14,10 @@ export interface MovieData {
     }
 
     @Injectable()
-    export class TmdbClientService {
+    export class MovieSearchService {
     private readonly tmdbApiKey: string;
     private readonly baseUrl = 'https://api.themoviedb.org/3';
-    private readonly logger = new Logger(TmdbClientService.name);
+    private readonly logger = new Logger(MovieSearchService.name);
 
     // 장르 ID 매핑
     private readonly genreMap: Record<string, number> = {
@@ -40,7 +40,7 @@ export interface MovieData {
     /**
      * [메인 메서드] 의도(Intent)에 따라 검색 전략을 분기합니다.
      */
-    async searchMovies(analysis: QueryAnalysisResult): Promise<MovieData[]> {
+    async search(analysis: MovieQueryAnalysisResult): Promise<MovieData[]> {
         const { intent, keywords } = analysis;
         this.logger.log(`🎬 검색 전략 실행: [${intent}]`);
 
@@ -68,15 +68,13 @@ export interface MovieData {
     // =================================================================
     // 1. Exact Search (완전 검색)
     // =================================================================
-    private async handleExactSearch(keywords: QueryAnalysisResult['keywords']): Promise<MovieData[]> {
+    private async handleExactSearch(keywords: MovieQueryAnalysisResult['keywords']): Promise<MovieData[]> {
         // 1-1. 제목이 있으면 제목으로 검색 (/search/movie)
         if (keywords.title) {
             this.logger.log(`검색어(제목)로 찾기: ${keywords.title}`);
             return this.searchByKeyword(keywords.title);
         }
 
-        // 1-2. 제목이 없고 인물(배우/감독)만 있다면 그 사람의 대표작 검색
-        // (예: "봉준호 영화 알려줘") -> Person ID 찾아서 Discover
         const personNames = [...keywords.actors, ...keywords.directors];
         if (personNames.length > 0) {
             this.logger.log(`인물로 대표작 찾기: ${personNames[0]}`);
@@ -90,7 +88,7 @@ export interface MovieData {
     // =================================================================
     // 2. Recommendation Search (추천 검색)
     // =================================================================
-    private async handleRecommendationSearch(keywords: QueryAnalysisResult['keywords']): Promise<MovieData[]> {
+    private async handleRecommendationSearch(keywords: MovieQueryAnalysisResult['keywords']): Promise<MovieData[]> {
         const targetTitle = keywords.title;
 
         if (!targetTitle) {
@@ -130,7 +128,7 @@ export interface MovieData {
     // =================================================================
     // 3. Condition Search (조건 검색)
     // =================================================================
-    private async handleConditionSearch(keywords: QueryAnalysisResult['keywords']): Promise<MovieData[]> {
+    private async handleConditionSearch(keywords: MovieQueryAnalysisResult['keywords']): Promise<MovieData[]> {
         this.logger.log(`조건 검색 시작: 배우(${keywords.actors}), 장르(${keywords.genres})`);
 
         // 3-1. ID 변환 (병렬 처리)
