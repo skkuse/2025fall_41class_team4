@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLMuse Chat (Multi-Session)</title>
+    <style>
+        body { font-family: 'Apple SD Gothic Neo', sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; display: flex; height: 100vh; }
+        
+        /* [왼쪽] 사이드바 (채팅 목록) */
+        .sidebar {
+            width: 260px;
+            background-color: #202123;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+        .new-chat-btn {
+            background-color: #343541;
+            color: white;
+            border: 1px solid #565869;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: left;
+            margin-bottom: 10px;
+            transition: 0.2s;
+        }
+        .new-chat-btn:hover { background-color: #40414f; }
+        
+        .session-list { flex: 1; overflow-y: auto; }
+        .session-item {
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        .session-item:hover { background-color: #2A2B32; }
+        .session-item.active { background-color: #343541; }
+        .delete-btn { color: #888; cursor: pointer; font-size: 12px; visibility: hidden; }
+        .session-item:hover .delete-btn { visibility: visible; }
+        .delete-btn:hover { color: #ff6b6b; }
+
+        /* [오른쪽] 메인 채팅 영역 */
+        .main-content { flex: 1; display: flex; flex-direction: column; background-color: #fff; }
+        
+        .header { 
+            padding: 15px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; 
+            background: #fff;
+        }
+        .controls select { padding: 5px; }
+
+        #chat-container { 
+            flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;
+            background-color: #f0f2f5;
+        }
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 12px; line-height: 1.5; font-size: 15px; position: relative; word-break: break-word; }
+        .user { align-self: flex-end; background-color: #007bff; color: white; border-bottom-right-radius: 2px; }
+        .assistant { align-self: flex-start; background-color: #fff; color: #333; border: 1px solid #ddd; border-bottom-left-radius: 2px; }
+        
+        .input-area { padding: 20px; background: #fff; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 5px; outline: none; font-size: 15px; }
+        button.send { padding: 0 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        
+        /* 카드 스타일 */
+        .card-container { margin-top: 10px; display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .card { min-width: 140px; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .card img { width: 100%; height: 180px; object-fit: cover; border-radius: 5px; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <button class="new-chat-btn" onclick="createNewSession()">+ New Chat</button>
+        <div class="session-list" id="session-list">
+            </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h3 id="chat-title" style="margin:0;">새로운 대화</h3>
+            <div class="controls">
+                <select id="category">
+                    <option value="movie">영화 모드</option>
+                    <option value="performance">공연 모드</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="chat-container">
+            </div>
+
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="질문을 입력하세요..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button class="send" onclick="sendMessage()">전송</button>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'llmuse_sessions'; // 모든 데이터가 여기에 저장됨
+        const CURRENT_ID_KEY = 'llmuse_current_id';
+
+        let sessions = []; // 전체 세션 목록
+        let currentSessionId = null; // 현재 보고 있는 세션 ID
+
+        const sessionListEl = document.getElementById('session-list');
+        const chatContainer = document.getElementById('chat-container');
+        const chatTitleEl = document.getElementById('chat-title');
+        const userInput = document.getElementById('user-input');
+        const categorySelect = document.getElementById('category');
+
+        // === [1] 초기화 및 로드 ===
+        window.onload = () => {
+            loadSessions();
+            
+            // 저장된 마지막 세션 열기, 없으면 새로 만들기
+            const lastId = localStorage.getItem(CURRENT_ID_KEY);
+            if (lastId && sessions.find(s => s.id == lastId)) {
+                switchSession(Number(lastId));
+            } else {
+                createNewSession();
+            }
+        };
+
+        // === [2] 세션 관리 로직 (CRUD) ===
+        function loadSessions() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            sessions = saved ? JSON.parse(saved) : [];
+            renderSessionList();
+        }
+
+        function saveSessions() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+            renderSessionList();
+        }
+
+        function createNewSession() {
+            const newId = Date.now(); // 시간기반 고유 ID
+            const newSession = {
+                id: newId,
+                title: "새로운 대화",
+                messages: []
+            };
+            sessions.unshift(newSession); // 목록 맨 위에 추가
+            saveSessions();
+            switchSession(newId);
+        }
+
+        function switchSession(id) {
+            currentSessionId = id;
+            localStorage.setItem(CURRENT_ID_KEY, id);
+            
+            const session = sessions.find(s => s.id === id);
+            if (!session) return;
+
+            // UI 업데이트
+            chatTitleEl.innerText = session.title;
+            chatContainer.innerHTML = ''; // 기존 메시지 비우기
+            session.messages.forEach(msg => renderMessageUI(msg.role, msg.content, msg.items));
+            renderSessionList(); // active 상태 갱신
+            scrollToBottom();
+        }
+
+        function deleteSession(e, id) {
+            e.stopPropagation(); // 부모 클릭 이벤트 방지
+            if (!confirm('대화를 삭제하시겠습니까?')) return;
+
+            sessions = sessions.filter(s => s.id !== id);
+            saveSessions();
+
+            // 지웠는데 현재 보고 있던 방이면 -> 첫 번째 방이나 새 방으로 이동
+            if (currentSessionId === id) {
+                if (sessions.length > 0) switchSession(sessions[0].id);
+                else createNewSession();
+            }
+        }
+
+        // === [3] 메시지 전송 로직 ===
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // 현재 세션 찾기
+            const session = sessions.find(s => s.id === currentSessionId);
+            if (!session) return;
+
+            // 1. 첫 대화면 제목 업데이트 (자동 제목 생성 효과)
+            if (session.messages.length === 0) {
+                session.title = text.length > 15 ? text.substring(0, 15) + '...' : text;
+                chatTitleEl.innerText = session.title;
+            }
+
+            // 2. 유저 메시지 추가
+            addMessageToSession(session, 'user', text);
+            renderMessageUI('user', text);
+            userInput.value = '';
+
+            try {
+                // 3. 백엔드 API 호출
+                const category = categorySelect.value;
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: category,
+                        question: text,
+                        userId: 1,
+                        sessionId: currentSessionId // 백엔드에 알려줌 (선택)
+                    })
+                });
+                const data = await response.json();
+
+                // 4. AI 답변 추가
+                addMessageToSession(session, 'assistant', data.answer, data.items);
+                renderMessageUI('assistant', data.answer, data.items);
+
+            } catch (error) {
+                console.error(error);
+                renderMessageUI('assistant', '오류가 발생했습니다.');
+            }
+        }
+
+        function addMessageToSession(session, role, content, items = []) {
+            session.messages.push({ role, content, items });
+            saveSessions(); // LocalStorage 저장
+        }
+
+        // === [4] UI 렌더링 헬퍼 ===
+        function renderSessionList() {
+            sessionListEl.innerHTML = '';
+            sessions.forEach(s => {
+                const div = document.createElement('div');
+                div.className = `session-item ${s.id === currentSessionId ? 'active' : ''}`;
+                div.onclick = () => switchSession(s.id);
+                div.innerHTML = `
+                    <span>${s.title}</span>
+                    <span class="delete-btn" onclick="deleteSession(event, ${s.id})">🗑️</span>
+                `;
+                sessionListEl.appendChild(div);
+            });
+        }
+
+        function renderMessageUI(role, text, items = []) {
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerText = text;
+
+            if (items && items.length > 0) {
+                const cardContainer = document.createElement('div');
+                cardContainer.className = 'card-container';
+                items.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    const imgUrl = item.poster_url || 'https://via.placeholder.com/150x200?text=No+Image';
+                    card.innerHTML = `
+                        <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/150x200?text=Error'">
+                        <div><b>${item.title}</b></div>
+                    `;
+                    cardContainer.appendChild(card);
+                });
+                div.appendChild(cardContainer);
+            }
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>

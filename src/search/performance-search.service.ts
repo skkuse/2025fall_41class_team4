@@ -10,7 +10,7 @@ export interface PerformanceData {
     id: string;
     title: string;
     type: string;        // 뮤지컬, 연극 등
-    image_url: string;  // 포스터 이미지
+    imageObject: string;  // 포스터 이미지
     start_date: string;
     end_date: string;
     eventSite: string;
@@ -96,7 +96,7 @@ export class PerformanceSearchService implements OnModuleInit {
                     id: id,
                     title: meta.title || '제목 없음',
                     type: meta.type || '기타',
-                    image_url: meta.image_url || '', // 메타데이터에 image_url 있다고 가정
+                    imageObject: meta.imageObject || '', // 메타데이터에 image_url 있다고 가정
                     start_date: meta.start_date || '',
                     end_date: meta.end_date || '',
                     eventSite: meta.eventSite || '',
