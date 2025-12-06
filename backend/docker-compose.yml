@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     volumes:
       # 로컬의 movie-rag-db 폴더를 컨테이너 내부에 연결
-      - ./Database/Data/movie-rag-db:/chroma/chroma
+      - ./backend/Database/Data/movie-rag-db:/chroma/chroma
     environment:
       - IS_PERSISTENT=TRUE
 
@@ -18,6 +18,6 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - ./Database/Data/performance-search-db:/chroma/chroma
+      - ./backend/Database/Data/performance-search-db:/chroma/chroma
     environment:
       - IS_PERSISTENT=TRUE

@@ -24,7 +24,9 @@ export class QueryRefinementService implements OnModuleInit {
         this.openai_key = openaiKey;
 
         // 1. ChromaDB 클라이언트 및 임베딩 함수 초기화
-        this.client = new ChromaClient({ path: chromaUrl });
+        this.client = new ChromaClient({
+            path: chromaUrl,
+        });
         this.embedder = new OpenAIEmbeddingFunction({
         apiKey: this.openai_key,
         modelName: 'text-embedding-3-small',
@@ -43,7 +45,7 @@ export class QueryRefinementService implements OnModuleInit {
             embeddingFunction: this.embedder,
             });
             this.collections.set(name, collection);
-            // this.logger.log(`✅ 컬렉션 연결됨: ${name}`);
+            this.logger.log(`✅ 컬렉션 연결됨: ${name}`);
         } catch (e) {
             this.logger.warn(`⚠️ 컬렉션을 찾을 수 없음: ${name} (데이터가 비어있을 수 있음)`);
         }

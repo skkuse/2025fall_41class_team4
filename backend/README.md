@@ -27,7 +27,7 @@
 
 ## 파일 구조
 ```
-root/
+backend/
 ├── .env                                          # [설정] MOVIE_DB_URL, PERFORMANCE_DB_URL 설정 필요
 ├── src/
 │   ├── app.module.ts                             # [메인] SearchModule 등 통합 등록
@@ -67,19 +67,19 @@ root/
 
 ## Project setup
 
-1. git clone으로 프로젝트를 받아옵니다.
+1. git clone으로 main 브랜치의 프로젝트를 받아옵니다.
 ```bash
 $ git clone https://github.com/skkuse/2025fall_41class_team4.git 
 ```
-2. 최상단 위치에 .env 파일을 만드셔서 해당 파일 내에 KOBIS, TMDB, OPENAI API 키를 작성해놓으시면 됩니다.
-3. 패키지 설치
+2. 최상단 위치에 .env 파일을 만드셔서 해당 파일 내에 KOBIS, TMDB, OPENAI API 키를 작성해놓으시면 됩니다. (backend / frontend 각각 폴더 안에 개별적으로 넣으시면 됩니다.)
+3. 패키지 설치 (backend / frontend 두 폴더 모두 실행)
 ```bash
 $ npm install
 ```
 ## ChromaDB Database Setting
 
 1. 주어진 Data 파일을 Database 폴더 안에 넣어둡니다. (./Database/Data/movie.db & performance.db) 
-2. 해당 Database 폴더 안에서 python 가상환경을 설치해주고, requirements도 설치해줍니다.
+2. 해당 Database 폴더 안에서 python 가상환경을 설치해주고, requirements도 설치해줍니다. 
 ```bash
 # python 가상환경 설치
 $ python -m venv myenv
@@ -97,11 +97,38 @@ $ chroma run --path ./Database/Data/movie.db --port 8000
 $ chroma run --path ./Database/Data/performance.db --port 8001
 ```
 
-## Compile and run the project
+## Backend Compile and run the project
 
 ```bash
 # watch mode - 해당 watch mode로 실행하시면 됩니다.
 $ npm run start:dev
+```
+
+## Frontend Compile and run the project
+
+```bash
+# 동일합니다.
+$ npm run start:dev
+```
+
+## 테스트 전 확인사항
+
+```bash
+프론트 / 백엔드 모두 실행해서 테스트하기 위해선 아래의 조건들을 확인해주세요.
+
+1. movie.db 켰는가? 
+$ chroma run --path ./Database/Data/movie.db --port 8000
+
+2. performance.db 켰는가?
+$ chroma run --path ./Database/Data/performance.db --port 8001
+
+3. 서버를 실행하고 있는가?
+$ npm run start:dev
+
+4. 프론트를 실행하고 있는가?
+$ npm run start:dev
+
+4개 요소 모두 실행되고 있어야 합니다.
 ```
 
 ## Query 전송 가이드
