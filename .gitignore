@@ -60,7 +60,7 @@ etl/
 
 Database/Data
 Database/myenv
-
+/공연데이터테스트용
 __pycache__/
 *.pyc
 
