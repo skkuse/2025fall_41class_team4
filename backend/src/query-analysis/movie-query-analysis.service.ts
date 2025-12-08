@@ -10,6 +10,7 @@ export interface MovieQueryAnalysisResult {
         genres: string[];   // (예: ["액션", "SF"])
         actors: string[];   // (예: ["머동석", "톰 크루즈"]) -> 오타 그대로 추출
         directors: string[];// (예: ["봉준호"])
+        timeframe: 'current' | 'upcoming' | null; // (예: 'current' -> 현재 상영작, 'upcoming' -> 개봉 예정작, null -> 해당없음)
     };
 }
 
@@ -20,7 +21,7 @@ export class MovieQueryAnalysisService {
 
     constructor(private configService: ConfigService) {
         const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-        if (!apiKey) {
+        if (!apiKey) {  
         throw new Error('OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.');
         }
         this.openai = new OpenAI({ apiKey });
@@ -64,10 +65,25 @@ export class MovieQueryAnalysisService {
 
         [Keywords(키워드) 추출 규칙]
         - 사용자가 언급한 고유명사(배우, 감독, 영화제목)는 **오타가 있어도 수정하지 말고 들리는 대로** 적으세요. (예: "머동석" -> "머동석")
-        - genres: 질문에서 유추되는 장르 (예: "웃긴"->코미디, "무서운"->공포, "슬픈"->드라마)
         - title: 영화 제목이 명시된 경우
         - actors: 배우 이름
         - directors: 감독 이름
+        - timeframe: 시점 관련 단어가 있으면 추출해.
+            - "현재 상영중", "요즘 영화", "최신 영화", "극장 동시 상영": "current"
+            - "개봉 예정", "다음달 영화", "기대작": "upcoming"
+            - 특별한 시점 언급이 없으면: null
+        - genres: 영화 장르
+            질문에 장르명이 직접 없더라도, 아래 단어가 포함되면 해당 장르를 'genres'에 반드시 추가하세요.
+            - "여자친구", "남자친구", "여친", "남친", "데이트", "연인", "사랑", "썸": -> "로맨스"
+            - "가족", "아이", "애들", "부모님": -> "가족"
+            - "우울해", "눈물", "슬픈": -> "드라마"
+            - "웃긴", "재밌는", "킬링타임", "생각 없이": -> "코미디"
+            - "무서운", "오싹한", "여름": -> "공포"
+            - "긴장감", "심장": -> "스릴러"
+            
+        **[중요] 배우/감독 추출 제외 대상 (Blacklist)**:
+            - 다음 단어들은 절대로 actors나 directors에 넣지 마세요:
+            - "여자친구", "남자친구", "여친", "남친", "애인", "가족", "부모님", "엄마", "아빠", "친구", "아이", "애들", "할머니", "할아버지", "배우", "감독", "사람", "주인공"
 
         [출력 형식 (JSON)]
         {
@@ -89,6 +105,7 @@ export class MovieQueryAnalysisService {
                 "genres": [],
                 "actors": [],
                 "directors": []
+                "timeframe": null
             }
         }
 
@@ -100,6 +117,7 @@ export class MovieQueryAnalysisService {
                 "genres": ["액션"],
                 "actors": ["머동석"],
                 "directors": []
+                "timeframe": null
             }
         }
 
@@ -111,6 +129,19 @@ export class MovieQueryAnalysisService {
                 "genres": [],
                 "actors": [],
                 "directors": []
+                "timeframe": null
+            }
+        }
+
+        질문: "지금 개봉 중인 로맨스 영화 있어?"
+        응답: {
+            "intent": "exact_search",
+            "keywords": {
+                "title": "",
+                "genres": ["로맨스"],
+                "actors": [],
+                "directors": []
+                "timeframe": "current"
             }
         }
         `;
@@ -119,7 +150,7 @@ export class MovieQueryAnalysisService {
 
         try {
             const completion = await this.openai.chat.completions.create({
-                model: 'gpt-4.1-nano', // 또는 gpt-3.5-turbo, gpt-4
+                model: 'gpt-4o-mini', // 또는 gpt-3.5-turbo, gpt-4
                 messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
@@ -148,6 +179,7 @@ export class MovieQueryAnalysisService {
                 genres: [],
                 actors: [],
                 directors: [],
+                timeframe: null
             },
         };
         }
