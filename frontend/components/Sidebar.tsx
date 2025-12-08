@@ -36,7 +36,7 @@ export default function Sidebar({
   return (
     <div 
       className="flex flex-col h-screen"
-      style={{ width: '224px', backgroundColor: '#4A5D4A' }}
+      style={{ width: '300px', backgroundColor: '#4A5D4A' }}
     >
       {/* Logo - 클릭 가능 */}
       <div 
@@ -101,7 +101,7 @@ export default function Sidebar({
             >
               <div className="flex items-center gap-3 overflow-hidden">
                 <ChatBubbleOutlineIcon style={{ fontSize: 14 }} />
-                <span className="text-sm truncate w-[120px]">
+                <span className="text-sm truncate w-[200px]">
                   {session.title}
                 </span>
               </div>
@@ -120,7 +120,7 @@ export default function Sidebar({
       </div>
 
       {/* Navigation */}
-      <div className="flex-1" style={{ padding: '0 12px' }}>
+      {/* <div className="flex-1" style={{ padding: '0 12px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <button
             onClick={() => onViewChange('chat')}
@@ -158,7 +158,7 @@ export default function Sidebar({
             <span>영화 검색</span>
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Settings Button */}
       <div style={{ padding: '12px' }}>
