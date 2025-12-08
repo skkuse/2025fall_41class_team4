@@ -118,7 +118,7 @@ export interface MovieData {
             }
             })
         );
-        return this.formatMovies(response.data.results.slice(0, 5));
+        return this.formatMovies(response.data.results.slice(0, 10));
         } catch (e) {
         this.logger.error(`추천 API 호출 실패`, e);
         return [];
@@ -160,7 +160,7 @@ export interface MovieData {
         const response = await firstValueFrom(
             this.httpService.get(`${this.baseUrl}/discover/movie`, { params })
         );
-        return this.formatMovies(response.data.results.slice(0, 5));
+        return this.formatMovies(response.data.results.slice(0, 10));
         } catch (e) {
             this.logger.error(`조건 검색(Discover) 실패`, e);
             return [];
@@ -185,7 +185,7 @@ export interface MovieData {
             }
             })
         );
-        return this.formatMovies(response.data.results.slice(0, 5));
+        return this.formatMovies(response.data.results.slice(0, 10));
         } catch (e) {
         this.logger.error(`키워드 검색 실패: ${query}`, e);
         return [];
@@ -222,13 +222,25 @@ export interface MovieData {
     // 데이터 포맷팅
     private formatMovies(rawMovies: any[]): MovieData[] {
         const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
-        return rawMovies.map(movie => ({
+
+        // 제외할 언어
+        const EXCLUDED_LANGS = ['zh', 'hi', 'kn'];
+
+        // 최종 반환 개수
+        const FINAL_COUNT = 5;
+
+        const formattedMovies = rawMovies
+        .filter(movie => !EXCLUDED_LANGS.includes(movie.original_language))            
+        .map(movie => ({
             id: movie.id,
             title: movie.title,
+            orginal_language: movie.original_language,
             overview: movie.overview || '줄거리 정보 없음',
             release_date: movie.release_date || '미정',
             vote_average: movie.vote_average,
             poster_url: movie.poster_path ? `${IMAGE_BASE_URL}${movie.poster_path}` : '',
-        }));
+        })).slice(0, FINAL_COUNT);
+
+        return formattedMovies;
     }
 }
