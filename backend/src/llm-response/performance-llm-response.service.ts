@@ -105,7 +105,7 @@ export class PerformanceLlmResponseService {
             let content = res.choices[0].message.content;
             if (!content) throw new Error("Empty LLM Response");
             
-            this.logger.debug(`📝 LLM Raw Output (Length: ${content.length})`);
+            // this.logger.debug(`📝 LLM Raw Output (Length: ${content.length})`);
 
             content = content.replace(/```json/g, '').replace(/```/g, '').trim();
 
@@ -131,9 +131,9 @@ export class PerformanceLlmResponseService {
                 };
 
             // [LOG 3] 최종 병합된 JSON 구조 확인 (터미널에서 보기 편하게 출력)
-            this.logger.log(
-                    `✨ 최종 응답 JSON 생성 완료:\n${JSON.stringify(finalResponse, null, 2)}`
-                );
+            // this.logger.log(
+            //         `✨ 최종 응답 JSON 생성 완료:\n${JSON.stringify(finalResponse, null, 2)}`
+            //     );
 
             return finalResponse;
 

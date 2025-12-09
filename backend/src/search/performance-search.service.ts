@@ -60,7 +60,7 @@ export class PerformanceSearchService implements OnModuleInit {
             this.logger.log('🎵 Performance DB 연결됨');
 
             const sample = await this.collection.peek({ limit: 1 });
-            this.logger.debug(`👀 DB 데이터 구조 확인 (Sample):\n${JSON.stringify(sample, null, 2)}`);
+            // this.logger.debug(`👀 DB 데이터 구조 확인 (Sample):\n${JSON.stringify(sample, null, 2)}`);
             } catch (e) {
             this.logger.warn(`⚠️ ChromaDB 연결 실패 (ETL 확인 필요): ${e}`);
             }
@@ -135,15 +135,15 @@ export class PerformanceSearchService implements OnModuleInit {
 
             if (!meta) continue;
 
-            if (i < 3) {
-                    this.logger.debug(`============== [DB 원본 데이터 확인 ${i + 1}] ==============`);
-                    this.logger.debug(`제목(Title): ${meta.title}`);
-                    this.logger.debug(`지역(City): ${meta.city}`);
-                    this.logger.debug(`상세지역(District): ${meta.district}`);
-                    this.logger.debug(`장소(Place): ${meta.place || meta.eventSite}`); // 필드명 확인용
-                    this.logger.debug(`전체 메타데이터: ${JSON.stringify(meta)}`); // 전체 구조 확인
-                    this.logger.debug(`========================================================`);
-                }
+            // if (i < 3) {
+            //         this.logger.debug(`============== [DB 원본 데이터 확인 ${i + 1}] ==============`);
+            //         this.logger.debug(`제목(Title): ${meta.title}`);
+            //         this.logger.debug(`지역(City): ${meta.city}`);
+            //         this.logger.debug(`상세지역(District): ${meta.district}`);
+            //         this.logger.debug(`장소(Place): ${meta.place || meta.eventSite}`); // 필드명 확인용
+            //         this.logger.debug(`전체 메타데이터: ${JSON.stringify(meta)}`); // 전체 구조 확인
+            //         this.logger.debug(`========================================================`);
+            //     }
 
             // [문서 source: 79] 후처리 필터링 (구/군 단위 정밀 검사)
             if (!this.locationMatch(meta, city, district)) continue;
