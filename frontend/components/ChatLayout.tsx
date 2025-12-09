@@ -76,6 +76,8 @@ export default function ChatLayout() {
             <MessageInput 
               onSendMessage={handleSendMessage} 
               disabled={isLoading}
+              category={category}
+              setCategory={setCategory}
             />
           </>
         ) : (

@@ -7,6 +7,10 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import LocalMoviesIcon from '@mui/icons-material/LocalMovies';
 import StarIcon from '@mui/icons-material/Star';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';   // 상승
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'; // 하락
+import RemoveIcon from '@mui/icons-material/Remove';             // 변동 없음
+import { TheaterComedy } from '@mui/icons-material';
 
 interface RightPanelProps {
   recommendationTabs: RecommendationTab[];
@@ -26,36 +30,71 @@ export default function RightPanel({
   boxOfficeList
 }: RightPanelProps) {
   
-  const activeTab = recommendationTabs.find(tab => tab.id === activeTabId);
-  // const displayMovies = activeTab ? activeTab.movies : (boxOfficeList || []);
-  // const isBoxOffice = !activeTab;
-  const displayMovies = boxOfficeList || [];
-  const isBoxOffice = true;
+  const renderRankInten = (inten: string) => {
+    const value = parseInt(inten, 10);
+    
+    // 1. 변동 없음 또는 데이터 없음 (회색)
+    if (isNaN(value) || value === 0) {
+      return (
+        <div className="flex items-center" style={{ color: '#8A9A8A', gap: '2px' }}>
+          <RemoveIcon style={{ fontSize: 14 }} />
+          <span style={{ fontSize: '11px', fontWeight: 'bold' }}>0</span>
+        </div>
+      );
+    }
 
-  const handleMovieClick = (movie: any) => {
-    // 박스오피스 데이터(BoxOfficeMovie)를 Movie 타입으로 변환해서 전달
-    onMovieSelect({ 
-        title: movie.title 
-    } as Movie);
+    // 2. 순위 상승 (빨간색 - 볼드체 강조)
+    if (value > 0) {
+      return (
+        <div className="flex items-center" style={{ color: '#D32F2F', gap: '1px' }}>
+          <TrendingUpIcon style={{ fontSize: 14 }} />
+          <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{value}</span>
+        </div>
+      );
+    }
+
+    // 3. 순위 하락 (파란색 - 깔끔한 느낌)
+    if (value < 0) {
+      return (
+        <div className="flex items-center" style={{ color: '#1976D2', gap: '1px' }}>
+          <TrendingDownIcon style={{ fontSize: 14 }} />
+          <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{Math.abs(value)}</span>
+        </div>
+      );
+    }
+
+    return null;
   };
-  // 영화 클릭 핸들러
-  // const handleMovieClick = (movie: Movie) => {
-  //   if (isBoxOffice) {
-  //     // 박스오피스 → 챗봇 질문
-  //     onMovieSelect({ title: movie.title } as Movie);
-  //   } else {
-  //     // 추천 결과 → 외부 링크 (TMDB 또는 네이버 영화)
-  //     const searchQuery = encodeURIComponent(movie.title);
-  //     // 옵션 1: TMDB
-  //     // window.open(`https://www.themoviedb.org/search?query=${searchQuery}`, '_blank');
-      
-  //     // 옵션 2: 네이버 영화 (한국 사용자용)
-  //     window.open(`https://search.naver.com/search.naver?where=nexearch&query=${searchQuery}+영화`, '_blank');
-      
-  //     // 옵션 3: 구글 검색
-  //     // window.open(`https://www.google.com/search?q=${searchQuery}+movie`, '_blank');
-  //   }
-  // };
+
+  const activeTab = recommendationTabs.find(tab => tab.id === activeTabId);
+  const isBoxOffice = activeTabId === null;
+
+  const displayItems = isBoxOffice ? (boxOfficeList || []) : (activeTab?.items || []);
+
+  const handleMovieClick = (item: any) => {
+    // 박스오피스 데이터(BoxOfficeMovie)를 Movie 타입으로 변환해서 전달
+    if (isBoxOffice) {
+      onMovieSelect({ title: item.title } as Movie);
+    } else {
+      if (item.eventSite) {
+        const url = item.booking_url || `https://search.naver.com/search.naver?query=${encodeURIComponent(item.title)}`;
+        window.open(url, '_blank');
+        return;
+      }
+      const url = `https://search.naver.com/search.naver?query=영화 ${encodeURIComponent(item.title)}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  const getPosterSrc = (item: any) => {
+      if (item.poster_url) { // 영화
+          return item.poster_url.startsWith('http') ? item.poster_url : `https://image.tmdb.org/t/p/w200${item.poster_url}`;
+      }
+      if (item.image_url) { // 공연
+          return item.image_url;
+      }
+      return '/MovingCastle.jpg';
+    };
 
   return (
     <div 
@@ -80,6 +119,7 @@ export default function RightPanel({
             display: 'flex',
             gap: '4px',
           }}
+          className="custom-scrollbar"
         >
           {/* 박스오피스 탭 */}
           <button
@@ -120,7 +160,12 @@ export default function RightPanel({
                 flexShrink: 0,
               }}
             >
-              <LocalMoviesIcon style={{ fontSize: 14 }} />
+              {tab.category === 'performance' ? (
+                <TheaterComedy style={{ fontSize: 14 }} />
+              ) : (
+                <LocalMoviesIcon style={{ fontSize: 14 }} />
+              )}
+
               <span style={{ maxWidth: '70px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {tab.title}
               </span>
@@ -163,101 +208,146 @@ export default function RightPanel({
         </p>
       </div>
 
-      {/* 영화 목록 */}
+      {/* 리스트 목록 */}
       <div className="flex-1 overflow-y-auto" style={{ padding: '12px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {displayMovies.map((movie: any, index: number) => (
-            <div
-              key={index}
-              onClick={() => handleMovieClick(movie)}
-              className="cursor-pointer transition-all group"
-              style={{
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                padding: '12px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #E5E5E5',
-              }}
-            >
-              <div className="flex items-center" style={{ gap: '12px' }}>
-                {/* 순위 또는 번호 */}
-                <div 
-                  className="flex items-center justify-center font-bold"
-                  style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '8px',
-                    backgroundColor: isBoxOffice 
-                      ? (movie.rank === 1 ? '#FFD700' : movie.rank === 2 ? '#C0C0C0' : movie.rank === 3 ? '#CD7F32' : '#E8F0E0')
-                      : '#E8F0E0',
-                    color: isBoxOffice && movie.rank && movie.rank <= 3 ? 'white' : '#4A5D4A',
-                    fontSize: '14px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {isBoxOffice ? movie.rank : index + 1}
-                </div>
-
-                {/* 포스터 */}
-                {/* <div 
-                  style={{
-                    width: '40px',
-                    height: '56px',
-                    borderRadius: '6px',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                  }}
-                >
-                  <img
-                    src={movie.poster_url || 'https://via.placeholder.com/40x56?text=No+Img'}
-                    alt={movie.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/40x56?text=No';
-                    }}
-                  />
-                </div> */}
-
-                {/* 정보 */}
-                <div className="flex-1" style={{ minWidth: 0 }}>
-                  <h4 
-                    className="font-semibold truncate"
-                    style={{ color: '#2A3A2A', fontSize: '13px', marginBottom: '2px' }}
-                  >
-                    {movie.title}
-                  </h4>
-                  <p 
-                    className="truncate"
-                    style={{ color: '#8A9A8A', fontSize: '11px', marginBottom: '4px' }}
-                  >
-                    누적 {Number(movie.audiAcc).toLocaleString()}명
-                  </p>
-                  <div className="flex items-center" style={{ gap: '8px' }}>
-                    <span className="flex items-center" style={{ color: '#5A8D4A', fontSize: '11px', fontWeight: '600', gap: '2px' }}>
-                      <StarIcon style={{ fontSize: 12, color: '#FFD700' }} />
-                      {movie.rankInten}
-                    </span>
-                    <span style={{ color: '#A8B8A8', fontSize: '11px' }}>
-                      {movie.openDt.slice(0, 4)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 외부 링크 아이콘 (추천 결과만) */}
-                {!isBoxOffice && (
-                  <OpenInNewIcon 
-                    className="group-hover:opacity-100"
-                    style={{ 
-                      fontSize: 16, 
-                      color: '#B8D4A8',
-                      opacity: 0.5,
-                      transition: 'opacity 0.2s',
-                    }} 
-                  />
-                )}
-              </div>
+          {displayItems.length === 0 ? (
+            <div className="text-center py-10 text-[#8A9A8A] text-xs">
+              추천 결과가 없습니다.
             </div>
-          ))}
+          ) : (
+            displayItems.map((item: any, index: number) => {
+              const isPerformance = !!item.eventSite;
+              return (
+                <div
+                  key={index}
+                  onClick={() => handleMovieClick(item)}
+                  className="cursor-pointer transition-all group flex"
+                  style={{
+                    backgroundColor: 'white',
+                    borderRadius: '12px',
+                    padding: '10px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    border: '1px solid #E5E5E5',
+                    gap: '12px',
+                    alignItems: 'center',
+                  }}
+                >
+                  {/* 1. 왼쪽: 순위 (박스오피스) 또는 포스터 추천*/}
+                  {isBoxOffice ? (
+                    <div 
+                      className="flex items-center justify-center font-bold"
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        backgroundColor: item.rank === 1 ? '#FFD700' : item.rank === 2 ? '#C0C0C0' : item.rank === 3 ? '#CD7F32' : '#E8F0E0',
+                        color: item.rank && item.rank <= 3 ? 'white' : '#4A5D4A',
+                        fontSize: '14px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.rank}
+                    </div>
+                  ) : (
+                    <div 
+                      style={{
+                        width: '40px',
+                        height: '56px',
+                        borderRadius: '6px',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        backgroundColor: '#f0f0f0'
+                      }}
+                    >
+                      <img
+                        src={getPosterSrc(item)}
+                        alt={item.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/MovingCastle.jpg';
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* 2. 중앙: 정보 */}
+                  <div className="flex-1" style={{ minWidth: 0 }}>
+                    <h4 
+                      className="font-semibold truncate"
+                      style={{ color: '#2A3A2A', fontSize: '13px', marginBottom: '2px' }}
+                    >
+                      {item.title}
+                    </h4>
+
+                    {isBoxOffice && (
+                    <>
+                      <p 
+                        className="truncate"
+                        style={{ color: '#8A9A8A', fontSize: '11px', marginBottom: '2px' }}>
+                        누적 {Number(item.audiAcc).toLocaleString()}명
+                        </p>
+                        <div className="flex items-center gap-2">
+                                {renderRankInten(item.rankInten)}
+                                <span style={{ color: '#A8B8A8', fontSize: '11px' }}>
+                                    {item.openDt?.slice(0, 4)}년
+                                </span>
+                            </div>
+                        </>
+                        )}
+                        {/* 추천 영화인 경우 (!isBoxOffice && !isPerformance) */}
+                        {!isBoxOffice && !isPerformance && (
+                        <>
+                            <div className="flex items-center gap-1 mb-1">
+                                <StarIcon style={{ fontSize: 12, color: '#F5C518' }} />
+                                <span style={{ fontSize: '11px', color: '#4A5D4A', fontWeight: 600 }}>
+                                    {item.vote_average ? item.vote_average.toFixed(1) : 'N/A'}
+                                </span>
+                                <span style={{ fontSize: '10px', color: '#A8B8A8' }}>
+                                    • {item.release_date?.slice(0, 4)}
+                                </span>
+                            </div>
+                            {item.genres && (
+                                <div className="flex gap-1 overflow-hidden">
+                                    {item.genres.slice(0, 2).map((g: string, i: number) => (
+                                        <span key={i} className="text-[10px] bg-[#F0F5EC] text-[#6A7D6A] px-1 rounded">
+                                            {g}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                        )}
+
+                        {/* 추천 공연인 경우 (!isBoxOffice && isPerformance) */}
+                        {!isBoxOffice && isPerformance && (
+                        <>
+                            <p className="truncate" style={{ color: '#6A7D6A', fontSize: '11px', marginBottom: '2px' }}>
+                                {item.eventSite} ({item.city})
+                            </p>
+                            <p style={{ color: '#8A9A8A', fontSize: '10px' }}>
+                                {item.start_date} ~ {item.end_date}
+                            </p>
+                        </>
+                        )}
+                    </div>
+
+                    {/* 3. 오른쪽: 외부 링크 아이콘 (추천 탭만) */}
+                    {!isBoxOffice && (
+                        <OpenInNewIcon 
+                        className="group-hover:opacity-100"
+                        style={{ 
+                            fontSize: 16, 
+                            color: '#B8D4A8',
+                            opacity: 0.5,
+                            transition: 'opacity 0.2s',
+                        }} 
+                        />
+                    )}
+                    </div>
+                );
+            })
+          )}
         </div>
       </div>
 
@@ -271,11 +361,12 @@ export default function RightPanel({
       >
         <p style={{ color: '#6A7D6A', fontSize: '11px', textAlign: 'center' }}>
           {isBoxOffice 
-            ? '💡 영화를 선택하면 자세한 정보를 알려드려요'
-            : '🔗 클릭하면 네이버 영화로 이동해요'
+            ? '💡 영화를 선택하면 채팅으로 정보를 물어봐요'
+            : '🔗 클릭하면 더 자세한 정보를 볼 수 있어요'
           }
         </p>
       </div>
     </div>
   );
 }
+          

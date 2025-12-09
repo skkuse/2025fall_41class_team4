@@ -2,14 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ChatRequestDto, ChatCategory } from './dto/chat-request.dto';
 
 import { MovieQueryAnalysisService } from '../query-analysis/movie-query-analysis.service';
-import { PerformanceQueryAnalysisService } from '../query-analysis/performance-query-analysis.service';
-
 import { QueryRefinementService } from '../query-refinement/query-refinement.service';
-
 import { MovieSearchService } from '../search/movie-search.service';
-import { PerformanceSearchService } from '../search/performance-search.service';
-
 import { MovieLlmResponseService } from '../llm-response/movie-llm-response.service';
+
+import { PerformanceQueryAnalysisService } from '../query-analysis/performance-query-analysis.service';
+import { PerformanceSearchService } from '../search/performance-search.service';
 import { PerformanceLlmResponseService } from '../llm-response/performance-llm-response.service';
 
 @Injectable()
@@ -18,16 +16,18 @@ export class ChatService {
 
     constructor(
         private readonly movieAnalysisService: MovieQueryAnalysisService,
-        private readonly performanceAnalysisService: PerformanceQueryAnalysisService,
         private readonly refinementService: QueryRefinementService,
         private readonly movieSearchService: MovieSearchService,
-        private readonly performanceSearchService: PerformanceSearchService,
         private readonly movieLlmResponseService: MovieLlmResponseService,
+
+        private readonly performanceAnalysisService: PerformanceQueryAnalysisService,
+        private readonly performanceSearchService: PerformanceSearchService,
         private readonly performanceLlmResponseService: PerformanceLlmResponseService,
     ) {}
 
     async handleChat(dto: ChatRequestDto) {
         const { category, question } = dto;
+        
         
         try {
         if (category === ChatCategory.MOVIE) {

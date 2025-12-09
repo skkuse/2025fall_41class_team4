@@ -11,38 +11,7 @@ export const useChat = () => {
   const [boxOfficeList, setBoxOfficeList] = useState<BoxOfficeMovie[]>([]);
 
   //   // 질문에서 탭 제목 추출
-  const extractTabTitle = (query: string): string => {
-    // 키워드 기반으로 짧은 제목 생성
-    const keywords: { [key: string]: string } = {
-      'sf': 'SF 영화',
-      '공상과학': 'SF 영화',
-      '우주': 'SF 영화',
-      '로맨스': '로맨스 영화',
-      '사랑': '로맨스 영화',
-      '연애': '로맨스 영화',
-      '액션': '액션 영화',
-      '스릴러': '스릴러 영화',
-      '뮤지컬': '뮤지컬 영화',
-      '음악': '뮤지컬 영화',
-      '놀란': '놀란 감독',
-      '봉준호': '봉준호 감독',
-      '평점': '평점 높은 영화',
-      '명작': '명작 영화',
-      '추천': '추천 영화',
-      '박스오피스': '박스오피스',
-      '순위': '박스오피스',
-    };
-
-    const lowerQuery = query.toLowerCase();
-    for (const [keyword, title] of Object.entries(keywords)) {
-      if (lowerQuery.includes(keyword)) {
-        return title;
-      }
-    }
-
-    // 키워드가 없으면 질문 앞부분 사용
-    return query.slice(0, 10) + (query.length > 10 ? '...' : '');
-  };
+  const generateId = () => Date.now().toString() + Math.random().toString(36).substring(2, 9);
 
   // [2] 초기 로드 (Local Storage에서 불러오기)
   useEffect(() => {
@@ -70,7 +39,7 @@ export const useChat = () => {
   // [3] 새 채팅방 만들기
   const createNewSession = useCallback(() => {
     const newSession: ChatSession = {
-      id: Date.now().toString(),
+      id: generateId(),
       title: '새로운 대화',
       messages: [],
       createdAt: new Date().toISOString(),
@@ -141,7 +110,7 @@ export const useChat = () => {
         id: Date.now() + 1,
         role: 'assistant',
         content: data.answer,
-        items: items
+        items: data.items
       };
 
       // (5) 상태 업데이트 (AI 답변 추가)
@@ -156,7 +125,8 @@ export const useChat = () => {
                 id: `rec-${Date.now()}`,
                 title: content.length > 8 ? content.slice(0, 8) + '...' : content,
                 query: content,
-                movies: items,
+                category: category,
+                items: items,
                 createdAt: new Date(),
               };
               newTabs = [...session.tabs, newTab];
