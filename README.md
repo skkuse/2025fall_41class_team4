@@ -92,7 +92,8 @@ $ source myenv/bin/activate
 ```
 3. 가상환경을 킨 상태로 movie.db, performance.db의 경로에 맞게 DB를 실행시켜줍니다.
 ```bash
-# 경로에 맞춰 ./Database/Data/chroma.db 부분을 수정해주시면 됩니다.
+# backend 폴더 내에서 ./Database/Data/chroma.db 부분을 수정해주시면 됩니다.
+# 참고로 /backend 폴더 내에서 실행하셔야 하며, /backend/Database 폴더 내에서 실행하면 ChromaDB 2개 생깁니다. -> 경로 주의할 것
 $ chroma run --path ./Database/Data/movie.db --port 8000
 $ chroma run --path ./Database/Data/performance.db --port 8001
 ```
