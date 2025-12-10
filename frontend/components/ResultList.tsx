@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Movie, SearchFilters } from '@/types';
-import { mockMovies } from '@/data/mockData';
 import MovieCard from './MovieCard';
 import SearchBar from './SearchBar';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
@@ -12,7 +11,16 @@ interface ResultListProps {
   onMovieClick?: (movie: Movie) => void;
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function ResultList({ onMovieClick }: ResultListProps) {
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalMovies, setTotalMovies] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 6;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({
     genre: '전체',
@@ -20,59 +28,42 @@ export default function ResultList({ onMovieClick }: ResultListProps) {
     rating: '전체',
     sortBy: 'popularity',
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
 
-  // 필터링 및 정렬된 영화 목록
-  const filteredMovies = useMemo(() => {
-    let result = [...mockMovies];
+  useEffect(() => {
+    fetchMovies();
+  }, [searchQuery, filters, currentPage]);
 
-    // 검색어 필터
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (movie) =>
-          movie.title.toLowerCase().includes(query)
-          
-          
-      );
-    }
+  const fetchMovies = async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortBy: filters.sortBy,
+      });
 
-    // 장르 필터
-    if (filters.genre !== '전체') {
-      result = result.filter((movie) => movie.genre.includes(filters.genre));
-    }
+      if (searchQuery) params.append('query', searchQuery);
+      if (filters.genre !== '전체') params.append('genre', filters.genre);
+      if (filters.year !== '전체') params.append('year', filters.year);
+      if (filters.rating !== '전체') params.append('rating', filters.rating);
 
-    // 평점 필터
-    if (filters.rating !== '전체') {
-      const minRating = parseInt(filters.rating);
-      if (!isNaN(minRating)) {
-        result = result.filter((movie) => movie.rating >= minRating);
+      console.log('🔍 영화 검색:', `${API_URL}/movies/search?${params}`);
+      const response = await fetch(`${API_URL}/movies/search?${params}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ 검색 결과:', data);
+        setMovies(data.movies || []);
+        setTotalMovies(data.total || 0);
+        setTotalPages(data.totalPages || 1);
       }
+    } catch (error) {
+      console.error('❌ 영화 검색 실패:', error);
+      setMovies([]);
+    } finally {
+      setIsLoading(false);
     }
-
-    // 정렬
-    switch (filters.sortBy) {
-      case 'latest':
-        result.sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
-        break;
-      case 'rating':
-        result.sort((a, b) => b.rating - a.rating);
-        break;
-      default:
-        // 인기순 (기본)
-        break;
-    }
-
-    return result;
-  }, [searchQuery, filters]);
-
-  // 페이지네이션
-  const totalPages = Math.ceil(filteredMovies.length / itemsPerPage);
-  const paginatedMovies = filteredMovies.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  };
 
   const handleSearch = (query: string, newFilters: SearchFilters) => {
     setSearchQuery(query);
@@ -80,22 +71,27 @@ export default function ResultList({ onMovieClick }: ResultListProps) {
     setCurrentPage(1);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-[#8A9A8A]">영화를 검색하는 중...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* 검색바 */}
       <SearchBar onSearch={handleSearch} />
 
-      {/* 결과 정보 */}
       <div className="flex items-center justify-between">
         <p className="text-[#6A7D6A]">
-          총 <span className="font-semibold text-[#4A5D4A]">{filteredMovies.length}</span>개의 영화
+          총 <span className="font-semibold text-[#4A5D4A]">{totalMovies}</span>개의 영화
         </p>
       </div>
 
-      {/* 영화 그리드 */}
-      {paginatedMovies.length > 0 ? (
+      {movies.length > 0 ? (
         <div className="grid grid-cols-3 gap-6">
-          {paginatedMovies.map((movie) => (
+          {movies.map((movie) => (
             <MovieCard key={movie.id} movie={movie} onClick={onMovieClick} />
           ))}
         </div>
@@ -106,7 +102,6 @@ export default function ResultList({ onMovieClick }: ResultListProps) {
         </div>
       )}
 
-      {/* 페이지네이션 */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-8">
           <button
@@ -117,7 +112,7 @@ export default function ResultList({ onMovieClick }: ResultListProps) {
             <NavigateBeforeIcon />
           </button>
           
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map((page) => (
             <button
               key={page}
               onClick={() => setCurrentPage(page)}

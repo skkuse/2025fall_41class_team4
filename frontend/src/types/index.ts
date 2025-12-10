@@ -1,53 +1,48 @@
-// 영화 타입
-export interface Movie {
-  id: number;
-  title: string;
-  overview: string;
-  release_date: string;
-  vote_average: number;
-  poster_url: string;
-  genres?: string[];
-}
-
-export interface Performance {
-  id: string;
-  title: string;
-  type: '연극' | '뮤지컬' | '오페라' | '음악' | '콘서트' | '국악' | '무용' | '전시' | '기타' | null;
-  image_url: string;
-  start_date: string;
-  end_date: string;
-  eventSite: string;
-  city: string;
-  district: string;
-  booking_url?: string; // 
-  score?: number;
-  summary?: string; // 한줄요약
-  reason?: string;  // 추천이유
-}
-
+// 채팅 메시지 타입
 export interface ChatMessage {
-  id: number | string;
+  id: string;
   role: 'user' | 'assistant';
   content: string;
-  items? : (Movie | Performance)[];
+  timestamp: Date;
+  items?: (Movie | Performance)[];
 }
 
-export interface BoxOfficeMovie {
-  rank: string;
+// 영화 타입
+export interface Movie {
+  rating: number;
+  id: number;
   title: string;
-  openDt: string;
+  poster_url: string | null;
+  release_date: string;
+  vote_average: number;
+  genres: string[];
+  overview?: string;
+  original_title?: string;
+  backdrop_path?: string | null;
+}
+
+// 공연 타입
+export interface Performance {
+  id: number;
+  title: string;
+  type: string;
+  eventSite: string;
+  city: string;
+  start_date: string;
+  end_date: string;
+  image_url: string;
+  booking_url?: string;
+  reason?: string;
+}
+
+// 박스오피스 영화 타입
+export interface BoxOfficeMovie {
+  rank: number | string;
+  title: string;
   audiAcc: string;
   rankInten: string;
-  poster_url?: string; 
-}
-
-export interface ChatSession {
-  id: string;      
-  title: string;   
-  messages: ChatMessage[]; 
-  createdAt: string;
-  tabs: RecommendationTab[]; 
-  activeTabId: string | null; 
+  openDt: string;
+  poster_url?: string;
 }
 
 // 검색 필터 타입
@@ -61,9 +56,18 @@ export interface SearchFilters {
 // 추천 결과 탭 타입
 export interface RecommendationTab {
   id: string;
-  title: string;        // 질문 내용 요약
+  title: string;
+  query: string;
   category: 'movie' | 'performance';
-  items: any[];
-  query: string;      // 실제 질문 내용
+  items: (Movie | Performance)[];
   createdAt: Date;
+}
+
+// 채팅 세션 타입
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: Date;
+  updatedAt: Date;
 }

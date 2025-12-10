@@ -12,23 +12,20 @@ import { Movie } from '@/types';
 export default function ChatLayout() {
   const [currentView, setCurrentView] = useState<'chat' | 'search'>('chat');
   const [category, setCategory] = useState<'movie' | 'performance'>('movie');
+  
   const { 
     messages, 
     isLoading, 
-    sendMessage, 
-    // clearAllChats,
-
+    sendMessage,
     sessions,
     currentSessionId,
     createNewSession,
     selectSession,
     deleteSession,
-    // 추천 탭 관련
     recommendationTabs,
     activeRecommendationTabId,
     selectRecommendationTab,
     closeRecommendationTab,
-    
     boxOfficeList
   } = useChat();
 
@@ -44,20 +41,29 @@ export default function ChatLayout() {
     createNewSession();
   };
 
+  // 로고 클릭 - 메인 화면으로
+  const handleLogoClick = () => {
+    setCurrentView('chat');
+    // 메시지가 있으면 새 대화 생성
+    if (sessions.length === 0 || messages.length > 0) {
+      createNewSession();
+    }
+  };
+
   // 영화 클릭 시 자동 질문
   const handleMovieSelect = (movie: Movie) => {
     const question = `${movie.title} 영화 정보를 알려줘`;
-    sendMessage(question, category);
+    sendMessage(question, 'movie');
   };
 
   return (
-    <div className="flex h-screen" style={{ backgroundColor: '#F5F1E8' }}>
+    <div className="flex h-screen" style={{ backgroundColor: '#F5F5F5' }}>
       {/* Left Sidebar */}
       <Sidebar
         currentView={currentView}
         onViewChange={setCurrentView}
+        onLogoClick={handleLogoClick}
         onNewChat={handleNewChat}
-
         sessions={sessions}
         currentSessionId={currentSessionId}
         onSelectSession={selectSession}
@@ -72,6 +78,7 @@ export default function ChatLayout() {
               messages={messages}
               isLoading={isLoading}
               onPromptClick={handlePromptClick}
+              category={category}
             />
             <MessageInput 
               onSendMessage={handleSendMessage} 
@@ -96,6 +103,7 @@ export default function ChatLayout() {
           onTabClose={closeRecommendationTab}
           onMovieSelect={handleMovieSelect}
           boxOfficeList={boxOfficeList}
+          category={category}
         />
       )}
     </div>

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Movie } from '@/types';
 import StarIcon from '@mui/icons-material/Star';
 
@@ -16,65 +15,102 @@ export default function MovieCard({ movie, onClick }: MovieCardProps) {
   const releaseYear = movie.release_date ? movie.release_date.slice(0, 4) : 'Unknown';
 
   const getPosterUrl = (path: string | null) => {
-    if (!path) return null;
+    if (!path) return DEFAULT_POSTER;
     return path.startsWith('http') ? path : `https://image.tmdb.org/t/p/w500${path}`;
   };
 
-  const initialSrc = getPosterUrl(movie.poster_url) || DEFAULT_POSTER;
-  const [imgSrc, setImgSrc] = useState(initialSrc);
+  const imgSrc = getPosterUrl(movie.poster_url);
 
-  useEffect(() => {
-    setImgSrc(getPosterUrl(movie.poster_url) || DEFAULT_POSTER);
-  }, [movie.poster_url]);
-
-const handleCardClick = () => {
-    // 1. 만약 부모에서 별도의 onClick을 내려줬다면 그걸 실행 (확장성 고려)
+  const handleCardClick = () => {
     if (onClick) {
       onClick(movie);
       return;
     }
-
-    // 2. 아니면 네이버 영화 검색으로 이동 (기본 동작)
-    // 검색어: "영화 제목" + " 영화" (정확도를 위해 '영화' 키워드 추가)
     const query = encodeURIComponent(`${movie.title} 영화`);
     const naverSearchUrl = `https://search.naver.com/search.naver?query=${query}`;
-    
-    // 새 탭에서 열기
     window.open(naverSearchUrl, '_blank');
+  };
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = DEFAULT_POSTER;
   };
 
   return (
     <div
       onClick={handleCardClick}
-      className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer group border border-[#E5E5E5] min-w-[160px] w-[160px] flex-shrink-0"
+      className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer border border-[#DEE2E6] min-w-40 w-40 shrink-0"
     >
-      {/* 포스터 이미지 */}
-      <div className="relative h-[240px] w-full bg-gray-100 overflow-hidden">
-      <img
+      {/* 포스터 */}
+      <div className="relative h-60 w-full bg-gray-100 overflow-hidden">
+        <img
           src={imgSrc} 
           alt={movie.title} 
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-          // 유효하지 않은 URL인 경우 기본 이미지 적용 
-          onError={() => setImgSrc(DEFAULT_POSTER)} 
+          className="w-full h-full object-cover transition-transform duration-300" 
+          onError={handleImageError}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
         />
-        {/* 평점 배지 */}
-        <div className="absolute top-2 right-2 bg-black/70 text-white px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
-          <StarIcon className="text-yellow-400" style={{ fontSize: 14 }} />
-          <span className="text-xs font-semibold">{movie.vote_average.toFixed(1)}</span>
+        {/* 평점 */}
+        <div style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          color: '#FFFFFF',
+          padding: '4px 8px',
+          borderRadius: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          backdropFilter: 'blur(4px)',
+        }}>
+          <StarIcon style={{ fontSize: 14, color: '#FFD700' }} />
+          <span style={{ fontSize: '13px', fontWeight: '600' }}>
+            {movie.vote_average.toFixed(1)}
+          </span>
         </div>
       </div>
 
-      {/* 영화 정보 */}
-      <div className="p-3 h-[90px] flex flex-col justify-between">
-        <h3 className="font-bold text-[#2A3A2A] text-sm mb-0.5 line-clamp-1">{movie.title}</h3>
-        <p className="text-[#8A9A8A] text-xs mb-2">{releaseYear}</p>
+      {/* 정보 */}
+      <div style={{ padding: '12px' }}>
+        <h3 
+          className="font-bold truncate"
+          style={{ 
+            color: '#212529', 
+            fontSize: '14px', 
+            marginBottom: '4px',
+          }}
+        >
+          {movie.title}
+        </h3>
+        <p 
+          className="truncate"
+          style={{ 
+            color: '#6C757D', 
+            fontSize: '12px', 
+            marginBottom: '8px',
+          }}
+        >
+          {releaseYear}
+        </p>
 
-        {/* 장르 태그 */}
+        {/* 장르 */}
         <div className="flex flex-wrap gap-1">
           {genres.slice(0, 2).map((g, index) => (
             <span
               key={index}
-              className="bg-[#E8F0E0] text-[#4A5D4A] text-xs px-1.5 py-0.5 rounded"
+              style={{
+                backgroundColor: '#E9ECEF',
+                color: '#495057',
+                fontSize: '11px',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontWeight: '500',
+              }}
             >
               {g}
             </span>

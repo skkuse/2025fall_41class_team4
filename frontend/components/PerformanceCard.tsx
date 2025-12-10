@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Performance } from '@/types';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -12,57 +11,77 @@ interface PerformanceCardProps {
 const DEFAULT_POSTER = '/MovingCastle.jpg';
 
 export default function PerformanceCard({ data }: PerformanceCardProps) {
-    const [imgSrc, setImgSrc] = useState(data.image_url || DEFAULT_POSTER);
+    const imgSrc = data.image_url || DEFAULT_POSTER;
 
-    useEffect(() => {
-        setImgSrc(data.image_url || DEFAULT_POSTER);
-    }, [data.image_url]);
-
-    // 날짜 포맷팅 (20251225 -> 2025.12.25)
     const formatDate = (dateValue: number | string) => {
         const str = String(dateValue);
         return `${str.slice(0, 4)}.${str.slice(4, 6)}.${str.slice(6, 8)}`;
     };
 
+    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        e.currentTarget.src = DEFAULT_POSTER;
+    };
+
     return (
-        <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all border border-[#E5E5E5] w-[220px] flex-shrink-0 flex flex-col">
-        {/* 1. 포스터 이미지 */}
+        <div 
+          className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all border border-[#DEE2E6] w-[220px] shrink-0 flex flex-col"
+        >
+        {/* 포스터 */}
         <div className="relative h-[280px] bg-gray-100 overflow-hidden">
             <img
                 src={imgSrc} 
                 alt={data.title} 
-                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" 
-                // 이미지 로드 실패 시 실행되는 이벤트 
-                onError={() => setImgSrc(DEFAULT_POSTER)} 
+                className="w-full h-full object-cover transition-transform duration-300"
+                onError={handleImageError}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
             />
             {/* 장르 배지 */}
-            <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm">
+            <div style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              color: '#FFFFFF',
+              fontSize: '10px',
+              padding: '4px 8px',
+              borderRadius: '12px',
+              backdropFilter: 'blur(4px)',
+            }}>
             {data.type}
             </div>
         </div>
 
-        {/* 2. 상세 정보 */}
+        {/* 정보 */}
         <div className="p-3 flex flex-col flex-1">
-            <h3 className="font-bold text-[#2A3A2A] text-sm mb-1 line-clamp-1" title={data.title}>
+            <h3 
+              className="font-bold line-clamp-1" 
+              title={data.title}
+              style={{ color: '#212529', fontSize: '14px', marginBottom: '4px' }}
+            >
             {data.title}
             </h3>
             
             {/* 장소 & 날짜 */}
             <div className="space-y-1 mb-3">
-            <div className="flex items-center text-[#6A7D6A] text-xs">
+            <div className="flex items-center" style={{ color: '#6C757D', fontSize: '12px' }}>
                 <LocationOnIcon style={{ fontSize: 12, marginRight: 4 }} />
                 <span className="truncate">{data.eventSite} ({data.city})</span>
             </div>
-            <div className="flex items-center text-[#8A9A8A] text-xs">
+            <div className="flex items-center" style={{ color: '#ADB5BD', fontSize: '12px' }}>
                 <CalendarTodayIcon style={{ fontSize: 12, marginRight: 4 }} />
                 <span>{formatDate(data.start_date)} ~</span>
             </div>
             </div>
 
-            {/* AI 추천 사유 (말풍선 스타일) */}
+            {/* AI 추천 이유 */}
             {data.reason && (
-            <div className="bg-[#F5F1E8] p-2 rounded-lg mb-3">
-                <p className="text-[#4A5D4A] text-xs leading-snug line-clamp-2">
+            <div style={{ backgroundColor: '#F8F9FA', padding: '8px', borderRadius: '8px', marginBottom: '12px' }}>
+                <p className="line-clamp-2" style={{ color: '#495057', fontSize: '12px', lineHeight: '1.4' }}>
                 💡 {data.reason}
                 </p>
             </div>
@@ -75,12 +94,33 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
                 href={data.booking_url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="block w-full text-center bg-[#4A5D4A] hover:bg-[#3A4D3A] text-white text-xs py-2 rounded-lg transition-colors font-medium"
+                className="block w-full text-center transition-colors font-medium"
+                style={{
+                  backgroundColor: '#343A40',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  padding: '8px',
+                  borderRadius: '8px',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#495057'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#343A40'}
                 >
                 상세정보
                 </a>
             ) : (
-                <button disabled className="w-full bg-gray-200 text-gray-400 text-xs py-2 rounded-lg cursor-not-allowed">
+                <button 
+                  disabled 
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#E9ECEF',
+                    color: '#ADB5BD',
+                    fontSize: '12px',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    cursor: 'not-allowed',
+                    border: 'none',
+                  }}
+                >
                 예매 정보 없음
                 </button>
             )}
