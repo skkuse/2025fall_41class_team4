@@ -1,4 +1,3 @@
-
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
@@ -33,24 +32,39 @@ export class PerformanceQueryAnalysisService {
     }
 
     async analyzeQuery(userQuestion: string): Promise<PerformanceQueryAnalysisResult> {
-        // const today = new Date();
-        // const todayStr = today.toISOString().slice(0,10).replace(/-/g,"");
-
+        // 1. 오늘 날짜 계산 (KST 기준)
         const today = new Date();
         const kstOffset = 9 * 60 * 60 * 1000; // UTC+9
         const kstDate = new Date(today.getTime() + kstOffset);
         const todayStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
+        const weekday = ['일', '월', '화', '수', '목', '금', '토'][kstDate.getDay()];
 
+        // [Python test_chatbot.py 로직 이식]
         const systemPrompt = `
-        너는 공연 검색 쿼리 분석가야. 사용자의 질문을 분석해서 다음 JSON 필드를 추출해.
+        현재 시각은 ${todayStr} (${weekday}요일)입니다.
+        사용자의 질문을 분석하여 다음 JSON 필드를 추출하세요.
 
-        - 입력 문장에서 공연 제목(고유명사), 분위기, 지역을 각각 식별하세요.
-        - keywords에서는 공연/뮤지컬/연극/추천/정보 등 일반 단어를 제거하고, 핵심 명사 또는 분위기 키워드만 남기세요.
-        - 고유명사가 없으면 감성/분위기 기반 키워드로 확장하세요.
-        - city는 한국의 광역자치단체만 넣으세요.
-        - district는 예: 강남구/수원시/해운대구 등 기초자치단체만 넣으세요.
-        - target_date는 질문에 날짜가 없으면 무조건 "${todayStr}"로 설정하세요.
-        - 반드시 JSON만 출력하세요.
+        [keywords 추출 규칙] ⭐ 핵심
+        1. **고유명사(제목)**가 발견되면, 불필요한 수식어('뮤지컬', '공연', '정보', '추천', '예매', '티켓', '보여줘', '알려줘')를 **모두 제거**하고 제목만 남기세요.
+            - 입력: "위키드 공연 정보 줘" -> keywords: "위키드"
+            - 입력: "시카고 보고싶어" -> keywords: "시카고"
+            - 입력: "뮤지컬 영웅 예매" -> keywords: "영웅"
+        
+        2. 고유명사가 없고 **분위기/상황**만 있다면, 검색이 잘 되도록 연관 단어로 확장하세요.
+            - 입력: "연인과 볼만한거" -> keywords: "로맨틱 데이트 사랑 연인"
+            - 입력: "신나는 거" -> keywords: "신나는 화려한 퍼포먼스"
+            - 입력: "아이랑 갈만한 곳" -> keywords: "가족 어린이 체험 교육"
+
+        [기타 필드 추출 규칙]
+        - **city**: 
+            - 한국의 광역자치단체만 넣으세요. (지역명은 keywords에서 빼고 여기로 이동)
+            - **[중요] 지역명이 언급되지 않았다면 반드시 null을 반환하세요. (절대 '서울'로 추측하거나 기본값을 넣지 마세요)**
+        - **district**: 기초자치단체(구/군/시)만 넣으세요.
+        - **target_date**: 
+            - 질문에 날짜가 없으면 무조건 "${todayStr}"로 설정하세요. (null 금지)
+            - "이번 주말", "크리스마스" 등은 "${todayStr}"를 기준으로 구체적인 날짜(YYYYMMDD)로 변환하세요.
+
+        반드시 JSON 형식으로만 응답하세요.
         `;
 
         let raw: any;
@@ -63,7 +77,7 @@ export class PerformanceQueryAnalysisService {
             { role: "user", content: userQuestion }
             ],
             response_format: { type: "json_object" },
-            temperature: 0.2
+            temperature: 0.1 // 분석의 정확도를 위해 온도를 낮춤
         });
 
         const content = res.choices[0].message.content;
@@ -79,56 +93,45 @@ export class PerformanceQueryAnalysisService {
         };
         }
 
-        // [수정] raw.keywords가 null이거나 배열일 수 있으므로 안전하게 처리
-        // const keywordsToClean = raw.keywords || userQuestion;
-        // raw.keywords = this.cleanKeywords(keywordsToClean);
-
-        // [수정 2] 정밀한 키워드 클리닝
-        
+        // 키워드 2차 정제 (함수 활용)
         const keywordsToClean = raw.keywords || userQuestion;
         raw.keywords = this.cleanKeywords(keywordsToClean, raw.city, raw.district);
 
-        // 날짜 누락 대비 안전장치
         if (!raw.target_date) {
             raw.target_date = todayStr;
         }
 
-        return QueryAnalysisSchema.parse(raw);
+        const finalResult = QueryAnalysisSchema.parse(raw);
+
+        // ▼▼▼ [요청하신 로그 추가] 터미널에서 확인 가능 ▼▼▼
+        this.logger.log(`🕵️ [Query Analysis 결과]
+        ---------------------------------------------------
+        💬 질문: "${userQuestion}"
+        🗝️ 키워드(Keywords): "${finalResult.keywords}"
+        🏙️ 지역(City/District): ${finalResult.city || '-'} / ${finalResult.district || '-'}
+        📅 날짜(Target Date): ${finalResult.target_date}
+        ---------------------------------------------------`);
+        // ▲▲▲ [로그 끝] ▲▲▲
+
+        return finalResult;
     }
 
-    // [핵심 수정] 입력 타입이 any여도 안전하게 문자열로 변환
+    // 키워드 정제 헬퍼 함수 (기존 유지)
     private cleanKeywords(kw: any, city: string | null, district: string | null): string {
         let k: string;
+        if (Array.isArray(kw)) k = kw.join(" ");
+        else if (typeof kw !== 'string') k = String(kw || "");
+        else k = kw;
 
-        // 1. 배열인 경우 공백으로 합침 (예: ["뮤지컬", "위키드"] -> "뮤지컬 위키드")
-        if (Array.isArray(kw)) {
-            k = kw.join(" ");
-        } 
-        // 2. 문자열이 아닌 경우 강제 형변환
-        else if (typeof kw !== 'string') {
-            k = String(kw || "");
-        } 
-        // 3. 정상 문자열
-        else {
-            k = kw;
-        }
+        if (city && k.includes(city)) k = k.replace(city, "");
+        if (district && k.includes(district)) k = k.replace(district, "");
 
-        if (city && k.includes(city)) {
-            k = k.replace(city, "");
-        }
-
-        if (district && k.includes(district)) {
-            k = k.replace(district, "");
-        }
-
-        // 4. 광역 시/도 제거
         this.KOREAN_CITIES.forEach(c => {
-            if (k.includes(c)) k = k.replace(c, "");
+        if (k.includes(c)) k = k.replace(c, "");
         });
 
-        // 5. 구/군/시 접미사 제거
         this.DISTRICT_SUFFIX.forEach(s => {
-            k = k.replace(new RegExp(`\\S+${s}`, "g"), ""); 
+        k = k.replace(new RegExp(`\\S+${s}`, "g"), ""); 
         });
 
         return k.replace(/\s+/g, " ").trim();
