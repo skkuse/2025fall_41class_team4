@@ -68,6 +68,8 @@ export interface ChatSession {
   id: string;
   title: string;
   messages: ChatMessage[];
+  recommendationTabs?: RecommendationTab[];
+  activeTabId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

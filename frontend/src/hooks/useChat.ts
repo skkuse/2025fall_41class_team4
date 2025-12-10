@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ChatMessage, ChatSession, RecommendationTab, Movie, Performance, BoxOfficeMovie } from '@/types';
+import { ChatMessage, ChatSession, RecommendationTab, BoxOfficeMovie } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -7,12 +7,14 @@ export const useChat = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [boxOfficeList, setBoxOfficeList] = useState<BoxOfficeMovie[]>([]);
-  const [recommendationTabs, setRecommendationTabs] = useState<RecommendationTab[]>([]);
-  const [activeRecommendationTabId, setActiveRecommendationTabId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
   const messages = currentSession?.messages || [];
+
+  const recommendationTabs = currentSession?.recommendationTabs || [];
+  const activeRecommendationTabId = currentSession?.activeTabId || null;
 
   // 박스오피스 데이터 가져오기
   const fetchBoxOffice = useCallback(async () => {
@@ -157,8 +159,16 @@ export const useChat = () => {
           createdAt: new Date(),
         };
 
-        setRecommendationTabs(prev => [...prev, newTab]);
-        setActiveRecommendationTabId(newTab.id);
+        setSessions(prev => prev.map(session =>
+          session.id === sessionId
+            ? {
+                ...session,
+                recommendationTabs: [...(session.recommendationTabs || []), newTab],
+                activeTabId: newTab.id,
+                updatedAt: new Date(),
+              }
+            : session
+        )); 
       }
 
     } catch (error) {
@@ -173,13 +183,13 @@ export const useChat = () => {
       id: newSessionId,
       title: '새 대화',
       messages: [],
+      recommendationTabs: [],
+      activeTabId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSessionId);
-    setRecommendationTabs([]);
-    setActiveRecommendationTabId(null);
   }, []);
 
   const selectSession = useCallback((sessionId: string) => {
@@ -198,18 +208,29 @@ export const useChat = () => {
   }, [currentSessionId]);
 
   const selectRecommendationTab = useCallback((tabId: string | null) => {
-    setActiveRecommendationTabId(tabId);
-  }, []);
+  setSessions(prev => prev.map(session =>
+    session.id === currentSessionId
+      ? { ...session, activeTabId: tabId }
+      : session
+      ));
+    }, [currentSessionId]);
 
-  const closeRecommendationTab = useCallback((tabId: string) => {
-    setRecommendationTabs(prev => {
-      const newTabs = prev.filter(tab => tab.id !== tabId);
-      if (activeRecommendationTabId === tabId) {
-        setActiveRecommendationTabId(newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null);
-      }
-      return newTabs;
-    });
-  }, [activeRecommendationTabId]);
+    const closeRecommendationTab = useCallback((tabId: string) => {
+      setSessions(prev => prev.map(session => {
+        if (session.id !== currentSessionId) return session;
+        
+        const newTabs = (session.recommendationTabs || []).filter(tab => tab.id !== tabId);
+        const newActiveId = session.activeTabId === tabId
+          ? (newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null)
+          : session.activeTabId;
+        
+        return {
+          ...session,
+          recommendationTabs: newTabs,
+          activeTabId: newActiveId,
+        };
+      }));
+    }, [currentSessionId]);
 
   return {
     messages,
