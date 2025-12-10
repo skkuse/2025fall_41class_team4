@@ -32,7 +32,7 @@ export class PerformanceLlmResponseService {
         제목: ${item.title}
         장소: ${item.eventSite} (${item.city} ${item.district})
         기간: ${item.start_date} ~ ${item.end_date}
-        내용: ${item.description.slice(0, 500)}...
+        줄거리_및_소개: ${item.description ? item.description.slice(0, 800) : "정보 없음 (네 지식으로 보완 필요)"}
         `).join("\n\n");
 
         const sys = `
@@ -49,7 +49,7 @@ export class PerformanceLlmResponseService {
             - 딱딱한 템플릿(항목 나열)에 얽매이지 마.
             - 질문의 의도에 맞춰서 **술술 읽히는 줄글(Narrative)** 형태로 답변해도 좋아
             - 단, 포스터는 사용하지마.
-            - **만약 줄거리가 없다면, 네가 가진 외부 지식(Pre-trained Knowledge)을 동원해서 해당 공연(특히 유명한 뮤지컬/연극)의 줄거리를 1~2문장으로 요약해서 채워넣어.**
+            - **추천의 기술**: 가장 적합한 공연 1개를 메인으로 강력 추천하고, 나머지는 서브로 소개해.
 
         2. **가독성 (필수)**:
             - 대신 가독성을 위해 **Markdown 문법**은 적극적으로 써줘.
@@ -62,6 +62,9 @@ export class PerformanceLlmResponseService {
             - 제공된 데이터(기간, 장소, 줄거리)를 문장에 자연스럽게 녹여내.
             - 예: "기간은 ~부터 ~까지입니다" (X) -> "오는 12월부터 예술의전당에서 만나보실 수 있어요." (O)
             - 줄거리나 특징을 언급할 때 "이 작품은 ~한 내용입니다" 보다는 "관객들은 ~한 지점에서 깊은 감동을 받았어요" 처럼 큐레이팅 하듯 설명해.
+            - **줄거리(description) 우선**: 답변을 작성할 때, 네가 가진 외부 지식보다 **제공된 [공연 목록]의 '줄거리_및_소개' 내용을 최우선으로 반영해.**
+            - 줄거리에 있는 구체적인 단어(등장인물, 스토리, 관람 포인트)를 인용해서 설명하면 더 좋아.
+            - 만약 '줄거리_및_소개'가 "정보 없음"이라면, 그때만 네가 가진 외부 지식을 활용해서 설명을 보충해.
 
         4. **message 작성법 **
             - 사용자의 질문의 의도에 맞춰서 답변해.
@@ -85,7 +88,7 @@ export class PerformanceLlmResponseService {
             "items": [
                 {
                     "id": "공연ID", 
-                    "description": "공연의 핵심 줄거리 또는 매력 포인트 (DB에 없으면 네가 생성)", 
+                    "description": "제공된 '줄거리_및_소개'를 바탕으로 한 자세히 설명.", 
                     "reason": "이 공연을 추천하는 구체적인 이유"}
             ]
         }
