@@ -53,7 +53,7 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
               backdropFilter: 'blur(4px)',
             }}>
             {data.type}
-            </div>
+            </div> */}
         </div>
 
         {/* 정보 */}

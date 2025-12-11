@@ -67,10 +67,31 @@ export class PerformanceSearchService implements OnModuleInit {
     }
 
     async search(a: PerformanceQueryAnalysisResult): Promise<PerformanceData[]> {
-        const { keywords, city, district, target_date } = a;
+        this.logger.log(`🔍 [Search Request] Input: ${JSON.stringify(a, null, 2)}`);
+        let { keywords, city, district, target_date, title } = a;
+
+        if (city) {
+            city = city.replace(/특별시|광역시|도|시|군|구$/g, '').trim();
+            if (city === '경기') {
+         }
+
+        }
 
         // 1. 1차 검색
-        let res = await this._runSearch(keywords, city, district, target_date);
+        let res = await this._runSearch(keywords, city, district, target_date, title);
+
+
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        if (res.length === 0 && !city && target_date === today) {
+        this.logger.log(`⚠️ '${keywords}' (도시/날짜 없음) 1차 실패 -> 날짜 필터 제거 후 재시도`);
+        
+        let res_no_date = await this._runSearch(keywords, city, district, '19700101', title); 
+        
+        if (res_no_date.length > 0) {
+            this.logger.log(`✅ 날짜 필터 제거 후 ${res_no_date.length}건 발견`);
+            res = res_no_date;
+        }
+    }
 
         // 2. [문서 source: 9] 1차 실패 & 도시 정보 있음 → 인접 도시 재검색 (Fallback)
         if (res.length === 0 && city) {
@@ -79,7 +100,7 @@ export class PerformanceSearchService implements OnModuleInit {
 
         for (const nc of fallbackCities) {
             // 인접 도시는 district 무시하고 광역으로 검색
-            res = await this._runSearch(keywords, nc, null, target_date);
+            res = await this._runSearch(keywords, nc, null, target_date, title);
             if (res.length > 0) {
             this.logger.log(`✅ 인접 도시 '${nc}'에서 ${res.length}건 발견`);
             break;
@@ -95,16 +116,20 @@ export class PerformanceSearchService implements OnModuleInit {
         city: string | null,
         district: string | null,
         date: string,
+        targetTitle: string | null
     ): Promise<PerformanceData[]> {
         if (!this.collection) return [];
 
         const dateNum = parseInt(date);
-
+        const isDateSearch = dateNum > 20000000;
+        const whereConditions: any[] = [];
         // [ChromaDB Where 절 구성 - 문서 source: 54-61]
-        const whereConditions: any[] = [
-        { start_date: { $lte: dateNum } },
-        { end_date: { $gte: dateNum } },
-        ];
+        if (isDateSearch) {
+        whereConditions.push(
+            { start_date: { $lte: dateNum } },
+            { end_date: { $gte: dateNum } }
+        );
+    }
 
         if (city) {
         if (city === '경기') {
@@ -149,7 +174,18 @@ export class PerformanceSearchService implements OnModuleInit {
             if (!this.locationMatch(meta, city, district)) continue;
 
             // [수정] 유사도 점수 음수 방지 (0점 미만은 0점으로)
-            const score = Math.max(0, Number(((1 - dist) * 100).toFixed(1)));
+            let score = Math.max(0, Number(((1 - dist) * 100).toFixed(1)));
+
+            if (targetTitle && meta.title) {
+                    // 공백 제거 후 포함 여부 확인 (느슨한 일치)
+                    const cleanMetaTitle = meta.title.replace(/\s+/g, '');
+                    const cleanTargetTitle = targetTitle.replace(/\s+/g, '');
+                    
+                    if (cleanMetaTitle.includes(cleanTargetTitle)) {
+                        score += 30; // 30점 보너스 (상위 노출 보장)
+                        this.logger.debug(`✨ 제목 매칭 보너스 적용: ${meta.title} (+30점)`);
+                    }
+                }
 
             out.push({
             id: ids[i],
