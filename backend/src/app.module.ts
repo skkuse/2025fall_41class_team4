@@ -8,7 +8,6 @@ import { QueryRefinementModule } from './query-refinement/query-refinement.modul
 import { SearchModule } from './search/search.module';
 import { LlmResponseModule } from './llm-response/llm-response.module';
 import { BoxOfficeModule } from './boxoffice/boxoffice.module';
-import { MoviesModule } from './movies/movies.module'; // 👈 추가
 
 @Module({
   imports: [
@@ -21,7 +20,7 @@ import { MoviesModule } from './movies/movies.module'; // 👈 추가
     SearchModule,
     LlmResponseModule,
     BoxOfficeModule,
-    MoviesModule,
+    
   ],
   controllers: [AppController],
   providers: [AppService],

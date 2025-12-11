@@ -41,7 +41,7 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
                 }}
             />
             {/* 장르 배지 */}
-            <div style={{
+            {/* <div style={{
               position: 'absolute',
               top: '8px',
               left: '8px',
@@ -53,7 +53,7 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
               backdropFilter: 'blur(4px)',
             }}>
             {data.type}
-            </div> */}
+            </div>  */}
         </div>
 
         {/* 정보 */}
@@ -79,10 +79,10 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
             </div>
 
             {/* AI 추천 이유 */}
-            {data.reason && (
-            <div style={{ backgroundColor: '#F8F9FA', padding: '8px', borderRadius: '8px', marginBottom: '12px' }}>
+            {data.summary && (
+            <div style={{ backgroundColor: '#f2f2f2', padding: '8px', borderRadius: '8px', marginBottom: '12px' }}>
                 <p className="line-clamp-2" style={{ color: '#495057', fontSize: '12px', lineHeight: '1.4' }}>
-                💡 {data.reason}
+                💡 {data.summary}
                 </p>
             </div>
             )}

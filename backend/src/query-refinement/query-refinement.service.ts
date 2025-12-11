@@ -62,25 +62,38 @@ export class QueryRefinementService implements OnModuleInit {
         const refined = JSON.parse(JSON.stringify(analysis)) as MovieQueryAnalysisResult;
         const { keywords } = refined;
 
-        // 1. 배우 이름 교정 (병렬 처리)
+        // [NEW] 교정 내역을 담을 배열 초기화
+        refined.correctedKeywords = [];
+
+        // 헬퍼 함수: 교정 실행 및 기록 저장
+        const processCorrection = async (collection: string, value: string) => {
+            const corrected = await this.searchAndCorrect(collection, value);
+            if (corrected !== value) {
+                // 값이 바뀌었으면 기록 (예: 주디훈 -> 주지훈)
+                refined.correctedKeywords?.push({ original: value, corrected: corrected });
+            }
+            return corrected;
+        };
+        
+        // 1. 배우 이름 교정
         if (keywords.actors && keywords.actors.length > 0) {
-        keywords.actors = await Promise.all(
-            keywords.actors.map((actor) => this.searchAndCorrect('movies_actors', actor))
-        );
+            keywords.actors = await Promise.all(
+                keywords.actors.map((actor) => processCorrection('movies_actors', actor))
+            );
         }
 
         // 2. 감독 이름 교정
         if (keywords.directors && keywords.directors.length > 0) {
-        keywords.directors = await Promise.all(
-            keywords.directors.map((director) => this.searchAndCorrect('movies_director', director))
-        );
+            keywords.directors = await Promise.all(
+                keywords.directors.map((director) => processCorrection('movies_director', director))
+            );
         }
 
-        // 3. 장르 교정 (예: '웃긴거' -> '코미디')
+        // 3. 장르 교정
         if (keywords.genres && keywords.genres.length > 0) {
-        keywords.genres = await Promise.all(
-            keywords.genres.map((genre) => this.searchAndCorrect('movies_genres', genre))
-        );
+            keywords.genres = await Promise.all(
+                keywords.genres.map((genre) => processCorrection('movies_genres', genre))
+            );
         }
 
         this.logger.log(`교정 완료: ${JSON.stringify(refined.keywords)}`);

@@ -158,7 +158,7 @@ export default function Sidebar({
       </div>
 
       {/* Settings Button */}
-      <div style={{ padding: '12px' }}>
+      {/* <div style={{ padding: '12px' }}>
         <button 
           className="w-full flex items-center justify-center font-medium transition-all"
           style={{
@@ -177,7 +177,7 @@ export default function Sidebar({
           <SettingsIcon fontSize="small" />
           <span>Settings</span>
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }

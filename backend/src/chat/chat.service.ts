@@ -43,7 +43,7 @@ export class ChatService {
             const movies = await this.movieSearchService.search(refinedAnalysis);
 
             // 4. 답변 생성
-            const response = await this.movieLlmResponseService.generateAnswer(question, movies);
+            const response = await this.movieLlmResponseService.generateAnswer(question, movies, refinedAnalysis);
 
             return {
             category,

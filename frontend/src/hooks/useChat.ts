@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { ChatMessage, ChatSession, RecommendationTab, BoxOfficeMovie } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const STORAGE_KEY = 'llmuse_sessions';
 
 export const useChat = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -38,6 +39,30 @@ export const useChat = () => {
     fetchBoxOffice();
   }, [fetchBoxOffice]);
 
+  // [수정] 초기 로드 (Local Storage에서 불러오기)
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsedSessions = JSON.parse(saved);
+        setSessions(parsedSessions);
+        if (parsedSessions.length > 0) {
+          // 저장된 세션이 있으면 첫 번째 세션을 선택
+          setCurrentSessionId(parsedSessions[0].id);
+        } else {
+          createNewSession();
+        }
+      } catch (e) {
+        console.error("세션 복구 실패:", e);
+        createNewSession();
+      }
+    } else {
+      createNewSession();
+    }
+    fetchBoxOffice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const extractTabTitle = (query: string): string => {
     const keywords: { [key: string]: string } = {
       'sf': 'SF 영화',
@@ -57,6 +82,28 @@ export const useChat = () => {
     return query.slice(0, 10) + (query.length > 10 ? '...' : '');
   };
 
+  const createNewSession = useCallback(() => {
+    const newSessionId = `session-${Date.now()}`;
+    const newSession: ChatSession = {
+      id: newSessionId,
+      title: '새 대화',
+      messages: [],
+      recommendationTabs: [],
+      activeTabId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    // setSessions(prev => [newSession, ...prev]);
+    // setCurrentSessionId(newSessionId);
+
+    setSessions(prev => {
+      const updated = [newSession, ...prev];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    setCurrentSessionId(newSessionId);
+  }, []);
+
   const sendMessage = useCallback(async (content: string, category: 'movie' | 'performance') => {
     // 세션이 없으면 새로 생성
     let sessionId = currentSessionId;
@@ -70,7 +117,12 @@ export const useChat = () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      setSessions([newSession]);
+        // [수정] 새 세션 자동 생성 시 저장
+        setSessions(prev => {
+        const updated = [newSession]; // 기존 세션이 없었으므로 새 배열
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
       setCurrentSessionId(newSessionId);
       sessionId = newSessionId;
     }
@@ -83,11 +135,28 @@ export const useChat = () => {
       timestamp: new Date(),
     };
 
-    setSessions(prev => prev.map(session =>
-      session.id === sessionId
-        ? { ...session, messages: [...session.messages, userMessage], updatedAt: new Date() }
-        : session
-    ));
+    // [수정] 사용자 메시지 추가 시 저장
+    setSessions(prev => {
+      const updated = prev.map(session => {
+        if (session.id === sessionId) {
+          
+          // [핵심 로직] 메시지가 하나도 없을 때(=첫 질문) 제목 변경
+          const newTitle = session.messages.length === 0 
+            ? (content.length > 15 ? content.slice(0, 15) + '...' : content) 
+            : session.title;
+
+          return { 
+            ...session, 
+            title: newTitle, // 변경된 제목 적용
+            messages: [...session.messages, userMessage], 
+            updatedAt: new Date() 
+          };
+        }
+        return session;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
 
     setIsLoading(true);
 
@@ -115,11 +184,16 @@ export const useChat = () => {
         items: items,
       };
 
-      setSessions(prev => prev.map(session =>
-        session.id === sessionId
-          ? { ...session, messages: [...session.messages, initialMessage], updatedAt: new Date() }
-          : session
-      ));
+      // [수정] AI 초기 메시지(빈 내용) 추가 시 저장
+      setSessions(prev => {
+        const updated = prev.map(session =>
+          session.id === sessionId
+            ? { ...session, messages: [...session.messages, initialMessage], updatedAt: new Date() }
+            : session
+        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
 
       setIsLoading(false);
 
@@ -142,11 +216,17 @@ export const useChat = () => {
           };
         }));
 
-        if (currentIndex >= responseContent.length) {
+      if (currentIndex >= responseContent.length) {
           clearInterval(typingInterval);
           setIsLoading(false);
+          
+          // [수정] 타이핑이 끝난 후 최종 상태 저장
+          setSessions(latestSessions => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(latestSessions));
+            return latestSessions;
+          });
         }
-      }, 20); // 20ms마다 한 글자 (조절 가능)
+      }, 20);
 
       // 추천 탭 생성
       if (items && items.length > 0) {
@@ -159,38 +239,29 @@ export const useChat = () => {
           createdAt: new Date(),
         };
 
-        setSessions(prev => prev.map(session =>
-          session.id === sessionId
-            ? {
-                ...session,
-                recommendationTabs: [...(session.recommendationTabs || []), newTab],
-                activeTabId: newTab.id,
-                updatedAt: new Date(),
-              }
-            : session
-        )); 
+        // [수정] 추천 탭 추가 시 저장
+        setSessions(prev => {
+          const updated = prev.map(session =>
+            session.id === sessionId
+              ? {
+                  ...session,
+                  recommendationTabs: [...(session.recommendationTabs || []), newTab],
+                  activeTabId: newTab.id,
+                  updatedAt: new Date(),
+                }
+              : session
+          );
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          return updated;
+        }); 
       }
 
     } catch (error) {
       console.error('❌ 메시지 전송 실패:', error);
-      // ... 에러 처리 ...
+      setIsLoading(false);
     }
   }, [currentSessionId]);
 
-  const createNewSession = useCallback(() => {
-    const newSessionId = `session-${Date.now()}`;
-    const newSession: ChatSession = {
-      id: newSessionId,
-      title: '새 대화',
-      messages: [],
-      recommendationTabs: [],
-      activeTabId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    setSessions(prev => [newSession, ...prev]);
-    setCurrentSessionId(newSessionId);
-  }, []);
 
   const selectSession = useCallback((sessionId: string) => {
     setCurrentSessionId(sessionId);
@@ -198,8 +269,11 @@ export const useChat = () => {
 
   const deleteSession = useCallback((sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // [수정] 세션 삭제 시 저장
     setSessions(prev => {
       const newSessions = prev.filter(s => s.id !== sessionId);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newSessions));
+      
       if (currentSessionId === sessionId) {
         setCurrentSessionId(newSessions.length > 0 ? newSessions[0].id : null);
       }
@@ -208,15 +282,22 @@ export const useChat = () => {
   }, [currentSessionId]);
 
   const selectRecommendationTab = useCallback((tabId: string | null) => {
-  setSessions(prev => prev.map(session =>
-    session.id === currentSessionId
-      ? { ...session, activeTabId: tabId }
-      : session
-      ));
-    }, [currentSessionId]);
+    // [수정] 탭 선택 상태 저장
+    setSessions(prev => {
+      const updated = prev.map(session =>
+        session.id === currentSessionId
+          ? { ...session, activeTabId: tabId }
+          : session
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, [currentSessionId]);
 
-    const closeRecommendationTab = useCallback((tabId: string) => {
-      setSessions(prev => prev.map(session => {
+  const closeRecommendationTab = useCallback((tabId: string) => {
+    // [수정] 탭 닫기 시 저장
+    setSessions(prev => {
+      const updated = prev.map(session => {
         if (session.id !== currentSessionId) return session;
         
         const newTabs = (session.recommendationTabs || []).filter(tab => tab.id !== tabId);
@@ -229,8 +310,11 @@ export const useChat = () => {
           recommendationTabs: newTabs,
           activeTabId: newActiveId,
         };
-      }));
-    }, [currentSessionId]);
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, [currentSessionId]);
 
   return {
     messages,

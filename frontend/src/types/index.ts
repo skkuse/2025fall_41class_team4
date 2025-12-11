@@ -32,7 +32,7 @@ export interface Performance {
   end_date: string;
   image_url: string;
   booking_url?: string;
-  reason?: string;
+  summary: string;
 }
 
 // 박스오피스 영화 타입
