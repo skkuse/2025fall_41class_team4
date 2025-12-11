@@ -36,9 +36,9 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
                 onError={() => setImgSrc(DEFAULT_POSTER)} 
             />
             {/* 장르 배지 */}
-            <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm">
+            {/* <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm">
             {data.type}
-            </div>
+            </div> */}
         </div>
 
         {/* 2. 상세 정보 */}
@@ -60,10 +60,10 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
             </div>
 
             {/* AI 추천 사유 (말풍선 스타일) */}
-            {data.reason && (
+            {data.summary && (
             <div className="bg-[#F5F1E8] p-2 rounded-lg mb-3">
                 <p className="text-[#4A5D4A] text-xs leading-snug line-clamp-2">
-                💡 {data.reason}
+                💡 {data.summary}
                 </p>
             </div>
             )}
