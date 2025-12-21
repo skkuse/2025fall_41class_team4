@@ -74,7 +74,7 @@ export default function PerformanceCard({ data }: PerformanceCardProps) {
             </div>
             <div className="flex items-center" style={{ color: '#ADB5BD', fontSize: '12px' }}>
                 <CalendarTodayIcon style={{ fontSize: 12, marginRight: 4 }} />
-                <span>{formatDate(data.start_date)} ~</span>
+                <span>{formatDate(data.start_date)} ~ {formatDate(data.end_date)}</span>
             </div>
             </div>
 
