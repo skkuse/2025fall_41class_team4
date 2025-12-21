@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEnum, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsNumber, IsArray, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum ChatCategory {
@@ -22,4 +22,16 @@ export class ChatRequestDto {
     @IsString()
     @IsNotEmpty()
     question: string;
+
+    @ApiProperty({
+        description: '과거 대화 내역 (기억력용)',
+        example: [
+            { role: 'user', content: '송강호 나오는 영화 알려줘' },
+            { role: 'assistant', content: '송강호 배우님의 대표작으로는 기생충, 택시운전사 등이 있습니다.' }
+        ],
+        required: false, // 처음 대화할 떄 false
+    })
+    @IsArray()   
+    @IsOptional()
+    history?: any[];
 }

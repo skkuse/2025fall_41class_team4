@@ -26,7 +26,7 @@ export class ChatService {
     ) {}
 
     async handleChat(dto: ChatRequestDto) {
-        const { category, question } = dto;
+        const { category, question, history } = dto;
         
         
         try {
@@ -43,7 +43,7 @@ export class ChatService {
             const movies = await this.movieSearchService.search(refinedAnalysis);
 
             // 4. 답변 생성
-            const response = await this.movieLlmResponseService.generateAnswer(question, movies, refinedAnalysis);
+            const response = await this.movieLlmResponseService.generateAnswer(question, movies, refinedAnalysis, history);
 
             return {
             category,

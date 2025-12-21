@@ -161,10 +161,21 @@ export const useChat = () => {
     setIsLoading(true);
 
     try {
+
+      const historyForBackend = messages.map(msg => ({
+          // 프론트엔드의 'sender'가 'user'면 'user', 아니면 'assistant'로 변환
+          role: msg.role,      // sender 대신 role일 수 있습니다.
+          content: msg.content // text 대신 content일 수 있습니다.
+      }));
+
+      // 너무 길면 최신 10개만 전달 (토큰 절약)
+      const limitedHistory = historyForBackend.slice(-10);
+
+
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, question: content }),
+        body: JSON.stringify({ category, question: content, history: limitedHistory}),
       });
 
       if (!response.ok) {
@@ -260,7 +271,7 @@ export const useChat = () => {
       console.error('❌ 메시지 전송 실패:', error);
       setIsLoading(false);
     }
-  }, [currentSessionId]);
+  }, [currentSessionId, messages]);
 
 
   const selectSession = useCallback((sessionId: string) => {
