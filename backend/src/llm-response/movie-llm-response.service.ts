@@ -24,13 +24,22 @@ export class MovieLlmResponseService {
         userQuestion: string, 
         movieData: MovieData[],
         analysisResult?: MovieQueryAnalysisResult,
-        history: any[] = []
+        history: any[] = [],
+        relevantMovies: any[] = []
     ): Promise<MovieResponse> {
         this.logger.log(`📝 답변 생성 시작 (검색된 영화: ${movieData.length}개)`);
         const corrections = analysisResult?.correctedKeywords || [];
         const correctionNotice = corrections.length > 0 
             ? corrections.map(c => `'${c.original}' -> '${c.corrected}'`).join(', ')
             : null;
+
+        //this.logger.log(`📦 [컨텍스트 재투입] 관련 영화 개수: ${relevantMovies.length}개`);
+    
+        /*if (relevantMovies.length > 0) {
+            //this.logger.log(`🎬 전달된 영화 데이터 상세: \n${JSON.stringify(relevantMovies, null, 2)}`);
+        } else {
+            //this.logger.warn(`⚠️ 전달된 관련 영화 데이터가 비어있습니다.`);
+        }*/
 
         const systemPrompt = `
         너는 영화 전문 AI 큐레이터 'LLMuse'야.
@@ -90,6 +99,9 @@ export class MovieLlmResponseService {
         [검색된 영화 데이터 (우선순위 1)]
         ${JSON.stringify(movieData, null, 2)}
 
+        [최근 대화에서 언급된 영화 상세 정보]
+        ${relevantMovies.length > 0 ? JSON.stringify(relevantMovies, null, 2) : "없음"}
+
         [오타 교정 정보]
         ${correctionNotice ? `시스템이 다음 단어를 교정했습니다: ${correctionNotice}` : '교정된 단어 없음.'}
 
@@ -97,7 +109,10 @@ export class MovieLlmResponseService {
         (각 영화 설명이 끝나면 **반드시 빈 줄을 추가**하여 읽기 편하게 말해줘.)
         가능한 한 **많은 영화 정보를 활용**해서 답변해줘.
         영화가 개봉 중인지, 개봉 예정인지 반드시 구분해서 설명해줘.
-        
+
+        (지시: 사용자가 '그 영화', '감독' 등 이전에 했던 이야기를 이어간다면, 
+        새로운 검색 결과가 없더라도 [최근 대화에서 언급된 영화 상세 정보]를 바탕으로 대답해줘.)
+
         (데이터가 비어있다면([]), 네 지식을 활용해서 질문에 답변해줘.)
         `;
 

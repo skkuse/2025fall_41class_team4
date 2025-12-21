@@ -34,4 +34,13 @@ export class ChatRequestDto {
     @IsArray()   
     @IsOptional()
     history?: any[];
+
+    @ApiProperty({
+    description: '최근 대화에서 검색되었던 데이터들',
+        required: false,
+    })
+    @IsArray()
+    @IsOptional()
+    relevantMovies?: any[]; // MovieData[] 타입을 써도 좋습니다.
+    
 }

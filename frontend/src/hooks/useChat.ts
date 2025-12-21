@@ -167,15 +167,24 @@ export const useChat = () => {
           role: msg.role,      // sender 대신 role일 수 있습니다.
           content: msg.content // text 대신 content일 수 있습니다.
       }));
-
-      // 너무 길면 최신 10개만 전달 (토큰 절약)
       const limitedHistory = historyForBackend.slice(-10);
 
+
+      const allRelevantMovies = currentSession?.recommendationTabs?.flatMap(tab => tab.items) || [];
+      // 너무 길면 최신 10개만 전달 (토큰 절약)
+      const uniqueMoviesMap = new Map();
+      allRelevantMovies.forEach(movie => {
+          if (movie && movie.id) {
+              uniqueMoviesMap.set(movie.id, movie);
+          }
+      });
+      
+      const limitedRelevantMovies = Array.from(uniqueMoviesMap.values()).slice(-10);
 
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, question: content, history: limitedHistory}),
+        body: JSON.stringify({ category, question: content, history: limitedHistory, relevantMovies: limitedRelevantMovies}),
       });
 
       if (!response.ok) {
