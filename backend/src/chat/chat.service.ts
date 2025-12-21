@@ -63,7 +63,7 @@ export class ChatService {
             const performances = await this.performanceSearchService.search(analysis);
 
             // 3. 답변 생성
-            const response = await this.performanceLlmResponseService.generateAnswer(question, performances, history);
+            const response = await this.performanceLlmResponseService.generateAnswer(question, performances);
 
             return {
                 category,

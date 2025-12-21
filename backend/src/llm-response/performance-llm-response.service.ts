@@ -14,7 +14,7 @@ export class PerformanceLlmResponseService {
         });
     }
 
-    async generateAnswer(question: string, items: PerformanceData[], history: any[] = []) {
+    async generateAnswer(question: string, items: PerformanceData[] = []) {
         this.logger.log(`🔍 답변 생성 시작 (검색된 공연: ${items.length}개)`);
 
         // 1. 검색 결과 없음 처리
@@ -37,7 +37,7 @@ export class PerformanceLlmResponseService {
 
         const sys = `
             너는 문화예술 공연 전문 AI 큐레이터 'LLMuse'다.
-            반드시 사용자가 준 질문과 아래 [공연 데이터(최대 5개)], 그리고 이전 대화 내역만 근거로 삼아 답한다.
+            반드시 사용자가 준 질문과 아래 [공연 데이터(최대 5개)]만 근거로 삼아 답한다.
             추측/상상/외부 사실 추가는 금지다.
 
             [절대 규칙 - 사실성]
@@ -157,7 +157,6 @@ export class PerformanceLlmResponseService {
                 model: "gpt-4o-mini", // 표현력을 위해 4o 사용
                 messages: [
                     { role: "system", content: sys },
-                    ...history,
                     { role: "user", content: userPrompt }
                 ],
                 temperature: 0.9,

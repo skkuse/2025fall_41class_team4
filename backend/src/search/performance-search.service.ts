@@ -70,16 +70,20 @@ export class PerformanceSearchService implements OnModuleInit {
         this.logger.log(`🔍 [Search Request] Input: ${JSON.stringify(a, null, 2)}`);
         let { keywords, city, district, target_date, title } = a;
 
+        // 1. 시/도 이름 정제 (경기도 -> 경기)
         if (city) {
             city = city.replace(/특별시|광역시|도|시|군|구$/g, '').trim();
-            if (city === '경기') {
-         }
-
         }
 
-        // 1. 1차 검색
-        let res = await this._runSearch(keywords, city, district, target_date, title);
+        // 2. 구/시 이름 정제 (수원시 -> 수원) - 이 부분을 추가해야 합니다!
+        if (district) {
+            district = district.replace(/특별시|광역시|도|시|군|구$/g, '').trim();
+        }
 
+        this.logger.log(`찾는 도시 ${city}, ${district}`); // 이제 '경기, 수원'으로 출력됩니다.
+
+        // 3. 1차 검색 실행
+        let res = await this._runSearch(keywords, city, district, target_date, title);
 
         const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         if (res.length === 0 && !city && target_date === today) {
@@ -132,11 +136,32 @@ export class PerformanceSearchService implements OnModuleInit {
     }
 
         if (city) {
-        if (city === '경기') {
-            whereConditions.push({ city: { $in: this.GYEONGGI_CITIES } });
-        } else {
-            whereConditions.push({ city: { $eq: city } });
+            if (city === '경기') {
+                // 경기도일 경우 GYEONGGI_CITIES에 포함되거나, city 자체가 '경기'인 경우 모두 포함
+                whereConditions.push({ 
+                    $or: [
+                        { city: { $in: this.GYEONGGI_CITIES } },
+                        { city: { $eq: '경기' } }
+                    ]
+                });
+            } else {
+                // 특정 도시가 들어온 경우 city나 district 중 하나라도 일치하면 검색
+                whereConditions.push({
+                    $or: [
+                        { city: { $eq: city } },
+                        { district: { $eq: city } }
+                    ]
+                });
+            }
         }
+
+        if (district) {
+            whereConditions.push({
+                $or: [
+                    { city: { $eq: district } },
+                    { district: { $eq: district } }
+                ]
+            });
         }
 
         try {
@@ -212,24 +237,27 @@ export class PerformanceSearchService implements OnModuleInit {
     }
 
     // [문서 source: 79] 사후 필터링 로직
-    private locationMatch(meta: any, city: string | null, district: string | null): boolean {
-        // 1. 도시 불일치 체크
-        if (city && meta.city) {
-        if (city === '경기') {
-            if (!this.GYEONGGI_CITIES.includes(meta.city)) return false;
-        } else if (meta.city !== city) {
-            return false;
-        }
+    private locationMatch(meta: any, targetCity: string | null, targetDistrict: string | null): boolean {
+        if (!targetCity && !targetDistrict) return true;
+
+        const metaCity = meta.city || '';
+        const metaDistrict = meta.district || '';
+
+        // 🎯 교차 검증: 타겟 district가 DB의 city에 들어있어도 성공으로 간주
+        if (targetDistrict) {
+            if (metaDistrict.includes(targetDistrict) || metaCity.includes(targetDistrict)) {
+                return true;
+            }
         }
 
-        // 2. 구/군 불일치 체크
-        if (district && meta.district) {
-        if (!meta.district.includes(district) && !district.includes(meta.district)) {
-            return false;
-        }
+        if (targetCity) {
+            if (metaCity.includes(targetCity) || metaDistrict.includes(targetCity)) {
+                return true;
+            }
         }
 
-        return true;
+        return false;
+
     }
 
     // [문서 source: 63] GPT를 이용한 인접 도시 탐색
