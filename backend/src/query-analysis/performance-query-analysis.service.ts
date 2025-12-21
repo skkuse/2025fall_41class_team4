@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 const QueryAnalysisSchema = z.object({
     keywords: z.string(),
+    title: z.string().nullable(),
     city: z.string().nullable(),
     district: z.string().nullable(),
     target_date: z.string(), // YYYYMMDD
@@ -23,6 +24,8 @@ export class PerformanceQueryAnalysisService {
         "세종","경기","강원","충북","충남","전북","전남",
         "경북","경남","제주"
     ];
+
+    
 
     private readonly DISTRICT_SUFFIX = ["구", "군", "시"];
 
@@ -50,6 +53,9 @@ export class PerformanceQueryAnalysisService {
         - city는 한국의 광역자치단체만 넣으세요.
         - district는 예: 강남구/수원시/해운대구 등 기초자치단체만 넣으세요.
         - target_date는 질문에 날짜가 없으면 무조건 "${todayStr}"로 설정하세요.
+        - 지역에 대한 언급이 없으면 city와 district를 null로 설정하세요.
+        - 주말과 같은 상대적인 날짜 표현이 나오면, ${todayStr} 기준으로 주말 날짜(토요일)를 YYYYMMDD 형식으로 변환하세요.
+        - 절대 날짜 표현이 나오면, YYYYMMDD 형식으로 변환하세요.
         - 반드시 JSON만 출력하세요.
         `;
 
@@ -71,13 +77,15 @@ export class PerformanceQueryAnalysisService {
         raw = JSON.parse(content);
         } catch (e) {
         this.logger.warn(`Analysis Fallback: ${e.message}`);
-        raw = {
-            keywords: userQuestion,
-            city: null,
-            district: null,
-            target_date: todayStr
-        };
+            raw = {
+                keywords: userQuestion,
+                title: null,
+                city: null,
+                district: null,
+                target_date: todayStr
+            };
         }
+
 
         // [수정] raw.keywords가 null이거나 배열일 수 있으므로 안전하게 처리
         // const keywordsToClean = raw.keywords || userQuestion;
@@ -86,12 +94,25 @@ export class PerformanceQueryAnalysisService {
         // [수정 2] 정밀한 키워드 클리닝
         
         const keywordsToClean = raw.keywords || userQuestion;
+
+        if (!raw.city) {
+            for (const city of this.KOREAN_CITIES) {
+                if (keywordsToClean.includes(city)) {
+                    raw.city = city;
+                    break; // 하나 찾으면 중단 (보통 질문엔 지역이 하나니까)
+                }
+            }
+        }
         raw.keywords = this.cleanKeywords(keywordsToClean, raw.city, raw.district);
 
         // 날짜 누락 대비 안전장치
         if (!raw.target_date) {
             raw.target_date = todayStr;
         }
+
+        if (!raw.title) raw.title = null;
+
+        this.logger.log('Query Analysis Result:', raw);
 
         return QueryAnalysisSchema.parse(raw);
     }
@@ -129,6 +150,15 @@ export class PerformanceQueryAnalysisService {
         // 5. 구/군/시 접미사 제거
         this.DISTRICT_SUFFIX.forEach(s => {
             k = k.replace(new RegExp(`\\S+${s}`, "g"), ""); 
+        });
+
+        // 3. [수정] 무조건적인 도시 삭제 로직 제거 또는 조건부 실행
+        // 위에서 city를 구출했으므로, 이제 남은 도시명은 '노이즈'로 간주하고 지워도 됨.
+        // 하지만 안전을 위해, '추출된 city'와 다른 도시명이 또 있을 때만 지우는 게 좋음.
+        this.KOREAN_CITIES.forEach(c => {
+            if (c !== city && k.includes(c)) { 
+                k = k.replace(c, ""); 
+            }
         });
 
         return k.replace(/\s+/g, " ").trim();

@@ -16,6 +16,7 @@ export interface MovieData {
     keywords?: string[];
     director?: string;
     actors?: string[];
+    release_status: string;
     }
 
     @Injectable()
@@ -222,7 +223,7 @@ export interface MovieData {
                 params: {
                     api_key: this.tmdbApiKey,
                     language: 'ko-KR', // 기본 한국어
-                    append_to_response: 'reviews,keywords, credits' // 리뷰, 키워드, 크레딧(감독/배우) 포함
+                    append_to_response: 'reviews,keywords,credits' // 리뷰, 키워드, 크레딧(감독/배우) 포함
                 }
                 })
             );
@@ -253,7 +254,7 @@ export interface MovieData {
                 reviews,
                 keywords: keywordList,
                 director,
-                cast
+                actors: cast
             };
             } catch (e) {
             // 상세 조회 실패해도 기본 정보는 반환
@@ -261,6 +262,11 @@ export interface MovieData {
             }
         })
         );
+
+        if (enriched.length > 0) {
+            const m = enriched[0];
+            this.logger.debug(`✅ 상세 정보 확인 (${m.title}): 감독=[${m.director}], 배우=[${m.actors?.join(', ')}]`);
+        }
 
         return enriched;
     }
@@ -394,17 +400,48 @@ export interface MovieData {
         // 최종 반환 개수
         const FINAL_COUNT = 5;
 
+        const now = new Date();
+        const kstOffset = 9 * 60 * 60 * 1000;
+        const kstDate = new Date(now.getTime() + kstOffset);
+        const todayStr = kstDate.toISOString().split('T')[0]; // "2025-12-21"
+        const todayTime = new Date(todayStr).getTime(); // 시간 통일을 위해 자정 기준 타임스탬프
+
         const formattedMovies = rawMovies
         .filter(movie => !EXCLUDED_LANGS.includes(movie.original_language))            
-        .map(movie => ({
-            id: movie.id,
-            title: movie.title,
-            orginal_language: movie.original_language,
-            overview: movie.overview || '줄거리 정보 없음',
-            release_date: movie.release_date || '미정',
-            vote_average: movie.vote_average,
-            poster_url: movie.poster_path ? `${IMAGE_BASE_URL}${movie.poster_path}` : '',
-        })).slice(0, FINAL_COUNT);
+        .map(movie => {
+            let status = "정보 없음";
+            
+            // 2. 개봉일 비교 로직
+            if (movie.release_date) {
+                const releaseTime = new Date(movie.release_date).getTime();
+                const diffMs = releaseTime - todayTime;
+                const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+                if (diffDays > 0) {
+                    status = `미개봉 (D-${diffDays})`; // 미래
+                } else if (diffDays === 0) {
+                    status = `오늘 개봉`; // 당일
+                } else {
+                    status = `개봉됨 (개봉 ${Math.abs(diffDays)}일차)`; // 과거
+                }
+            } else {
+                status = "개봉일 미정";
+            }
+
+            return {
+                id: movie.id,
+                title: movie.title,
+                orginal_language: movie.original_language,
+                overview: movie.overview || '줄거리 정보 없음',
+                release_date: movie.release_date || '미정',
+                vote_average: movie.vote_average,
+                poster_url: movie.poster_path ? `${IMAGE_BASE_URL}${movie.poster_path}` : '',
+                // [NEW] 계산된 상태값 주입
+                release_status: status 
+            };
+        }).slice(0, FINAL_COUNT);
+
+        this.logger.debug(`✅ [Formatted Output]: ${JSON.stringify(formattedMovies, null, 2)}`);
 
         return formattedMovies;
     }

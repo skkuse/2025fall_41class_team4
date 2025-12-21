@@ -12,6 +12,7 @@ export interface MovieQueryAnalysisResult {
         directors: string[];// (예: ["봉준호"])
         timeframe: 'current' | 'upcoming' | null; // (예: 'current' -> 현재 상영작, 'upcoming' -> 개봉 예정작, null -> 해당없음)
     };
+    correctedKeywords?: { original: string; corrected: string }[];
 }
 
 @Injectable()
