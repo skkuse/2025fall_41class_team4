@@ -69,8 +69,11 @@ export class QueryRefinementService implements OnModuleInit {
         const processCorrection = async (collection: string, value: string) => {
             const corrected = await this.searchAndCorrect(collection, value);
             if (corrected !== value) {
-                // 값이 바뀌었으면 기록 (예: 주디훈 -> 주지훈)
-                refined.correctedKeywords?.push({ original: value, corrected: corrected });
+                const isChainsawManCase = (value === '체인소맨' && corrected === '극장판 체인소 맨: 레제편');
+                if(!isChainsawManCase){
+                    // 값이 바뀌었으면 기록 (예: 주디훈 -> 주지훈)
+                    refined.correctedKeywords?.push({ original: value, corrected: corrected });
+                }
             }
             return corrected;
         };

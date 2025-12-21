@@ -265,7 +265,6 @@ export interface MovieData {
 
         if (enriched.length > 0) {
             const m = enriched[0];
-            this.logger.debug(`✅ 상세 정보 확인 (${m.title}): 감독=[${m.director}], 배우=[${m.actors?.join(', ')}]`);
         }
 
         return enriched;
@@ -278,14 +277,20 @@ export interface MovieData {
     // 단순 키워드(제목) 검색
     private async searchByKeyword(query: string): Promise<MovieData[]> {
         try {
-        const response = await firstValueFrom(
-            this.httpService.get(`${this.baseUrl}/search/movie`, {
-            params: {
-                api_key: this.tmdbApiKey,
-                language: 'ko-KR',
-                query: query,
-                page: 1
+            const refinedQuery = query === '체인소맨' ? '극장판 체인소 맨: 레제편' : query;
+
+            if (query !== refinedQuery) {
+                this.logger.log(`🔧 체인소맨 예외 처리 적용: ${query} -> ${refinedQuery}`);
             }
+
+            const response = await firstValueFrom(
+                this.httpService.get(`${this.baseUrl}/search/movie`, {
+                params: {
+                    api_key: this.tmdbApiKey,
+                    language: 'ko-KR',
+                    query: refinedQuery,
+                    page: 1
+                }
             })
         );
         return this.formatMovies(response.data.results.slice(0, 10));
@@ -441,7 +446,7 @@ export interface MovieData {
             };
         }).slice(0, FINAL_COUNT);
 
-        this.logger.debug(`✅ [Formatted Output]: ${JSON.stringify(formattedMovies, null, 2)}`);
+        //this.logger.debug(`✅ [Formatted Output]: ${JSON.stringify(formattedMovies, null, 2)}`);
 
         return formattedMovies;
     }
